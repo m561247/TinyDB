@@ -14,3 +14,6 @@
 }
 
 使用 Command+Shift+P 快捷键调出输入框，选择 SFTP:Config 回车
+
+https://www.cnblogs.com/sxdcgaq8080/p/10530176.html
+sync to github token 
