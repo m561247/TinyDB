@@ -196,5 +196,3 @@ void execute_quit()
 	dbms::get_instance()->close_database();
 	printf("[exit] good bye!\n");
 }
-
-

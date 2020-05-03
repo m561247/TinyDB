@@ -44,16 +44,20 @@ set(HEADERS
 # Google Test
 set(BUILD_GTEST ON CACHE BOOL "Builds the googletest subproject" FORCE)
 set(BUILD_GMOCK OFF CACHE BOOL "Builds the googlemock subproject" FORCE)
-add_subdirectory(googletest)
+add_subdirectory(gtest)
 set_target_properties(gtest gtest_main PROPERTIES
 	FOLDER libraries
 )
+
+# User Library
 add_subdirectory(CppStringPlus)
 add_subdirectory(SystemPort)
+add_subdirectory(protocol)
 
 add_library(${CMAKE_PROJECT_NAME}_lib ${SOURCE} ${HEADERS})
 add_executable(${CMAKE_PROJECT_NAME} src/main.cpp)
 target_link_libraries(${CMAKE_PROJECT_NAME} 
 					  sql_parser
 					  ${CMAKE_PROJECT_NAME}_lib
-					  SystemPort)
+					  SystemPort
+					  protocol)

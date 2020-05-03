@@ -12,6 +12,9 @@
 #include <sys/socket.h>
 #include <algorithm>
 #include "parser/execute.h"
+#include <protocol/Greeting.hpp>
+#include <protocol/Auth.hpp>
+
 #define IPV4_ADDRESS_IN_SOCKADDR sin_addr.s_addr
 #define SOCKADDR_LENGTH_TYPE socklen_t
 
@@ -36,6 +39,22 @@ struct Packet {
 
 };
 
+struct StreamPacket {
+
+        std::vector< uint8_t > payload;
+
+        std::shared_ptr< SystemAbstractions::NetworkConnection > connection;
+
+        StreamPacket(
+            const std::vector< uint8_t >& newPayload,
+            std::shared_ptr< SystemAbstractions::NetworkConnection > newConnection
+        ) 
+            : payload(newPayload)
+            , connection(newConnection)
+        {
+        }
+
+};
 
 struct Owner {
 
@@ -53,8 +72,12 @@ struct Owner {
 
     std::vector< uint8_t > streamReceived;
 
+    std::vector< StreamPacket > streamPacket;
+
     std::vector< std::shared_ptr< SystemAbstractions::NetworkConnection > > connections;
 
+    std::vector< uint8_t > GreetingPacket;
+   
     /**
      *  This flag indicates whether or not a connection
      *  to the network endpoint has been broken
@@ -92,12 +115,25 @@ struct Owner {
         );
     }
 
+    bool AwaitStreamPacket() {
+        std::unique_lock< decltype(mutex) > lock(mutex);
+        return condition.wait_for(
+            lock,
+            std::chrono::seconds(1),
+            [this] {
+                // std::printf("Check streamPacket... \n");
+                return !streamPacket.empty();
+            }
+        );
+    }
+
     bool AwaitConnection() {
         std::unique_lock< decltype(mutex) > lock(mutex);
         return condition.wait_for(
             lock,
             std::chrono::seconds(1),
             [this]{
+                // std::printf("Check is client connected... \n");
                 return !connections.empty();
             }
         );
@@ -140,10 +176,12 @@ struct Owner {
     void NetworkEndpointNewConnection(std::shared_ptr< SystemAbstractions::NetworkConnection > newConnection) {
         std::unique_lock< decltype(mutex) > lock(mutex);
         connections.push_back(newConnection);
+        std::printf("%d:%d connected\n", newConnection->GetPeerAddress(), newConnection->GetPeerPort());
+        newConnection->SendMessage(GreetingPacket);
         condition.notify_all();
         (void)newConnection->Process(
-            [this](const std::vector< uint8_t >& message) {
-                NetworkConnectionMessageReceived(message);
+            [this, newConnection](const std::vector< uint8_t >& message) {
+                NetworkConnectionMessageReceived(message, newConnection);
             },
             [this](bool) {
                 NetworkConnectionBroken();
@@ -169,13 +207,14 @@ struct Owner {
      * This is the callback issued whenever more
      * data is received from the peer of the connection 
      */
-    void NetworkConnectionMessageReceived(const std::vector< uint8_t >& message) {
+    void NetworkConnectionMessageReceived(const std::vector< uint8_t >& message, std::shared_ptr< SystemAbstractions::NetworkConnection > newConnection) {
         std::unique_lock< decltype(mutex) > lock(mutex);
-        streamReceived.insert(
-            streamReceived.end(),
-            message.begin(),
-            message.end()
-        );
+        // streamReceived.insert(
+        //     streamReceived.end(),
+        //     message.begin(),
+        //     message.end()
+        // );
+        streamPacket.emplace_back(message, newConnection);
         condition.notify_all();
     }
 
@@ -202,24 +241,41 @@ void free_all(int num) {
 
 int main(int argc, char *argv[])
 {
-  // std::string userInput;
-  // printf("WELCOME TO TINY DB!\n");
-  // printf(">> ");
-  // signal(SIGINT, free_all);
+  std::string userInput;
+  printf("WELCOME TO TINY DB!\n");
+  printf(">> ");
+  signal(SIGINT, free_all);
 
-  // while(getline(std::cin, userInput)) {
-  //     if (userInput == "quit") {
-  //       break;
-  //     }
-  //     run_parser(userInput.c_str());
-  //     printf(">> ");
-  // }
+//   while(getline(std::cin, userInput)) {
+//       if (userInput == "quit") {
+//         break;
+//       }
+//       std::vector < uint8_t > bytes(userInput.begin(), userInput.end());
+//       for (auto c: bytes) {
+//         std::cout << std::to_string(c) << ", ";
+//       }
+//       run_parser(userInput.c_str());
+//       printf(">> ");
+//   }
   // std::cout << "close" << std::endl;
   // // close db
   // execute_quit();
    // Set up the NetworkEndpoint
   SystemAbstractions::NetworkEndpoint endpoint;
   Owner owner;
+  Protocol::GreetingPacket gp(1, "TinyDB-v0.0.1");
+  std::vector< uint8_t > outputPacket = gp.Pack();
+  owner.GreetingPacket.push_back(outputPacket.size());
+  owner.GreetingPacket.push_back(0x00);
+  owner.GreetingPacket.push_back(0x00);
+  owner.GreetingPacket.push_back(0x00);
+
+  owner.GreetingPacket.insert(
+      owner.GreetingPacket.end(),
+      outputPacket.begin(),
+      outputPacket.end()
+  );
+
   endpoint.Open(
       [&owner](
           std::shared_ptr< SystemAbstractions::NetworkConnection > newConnection
@@ -234,19 +290,74 @@ int main(int argc, char *argv[])
       SystemAbstractions::NetworkEndpoint::Mode::Connection,
       0,
       0,
-      12306        
+      12306
   );
-
+  
+  const std::string messageAsString("+OK\r\n");
+  const std::vector< uint8_t > messageAsVector(messageAsString.begin(), messageAsString.end());
+  const std::vector< uint8_t > GreetingPacket{74, 0, 0, 0, 10, 70, 97, 107, 101, 68, 66, 0, 1, 0, 0, 0, 102, 116, 41, 51, 66, 52, 110, 64, 0, 13, 162, 33, 2, 0, 9, 1, 21, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 45, 51, 83, 62, 28, 73, 47, 89, 16, 110, 12, 38, 0, 109, 121, 115, 113, 108, 95, 110, 97, 116, 105, 118, 101, 95, 112, 97, 115, 115, 119, 111, 114, 100, 0};
+  std::vector< uint8_t > OkPacket = {7, 0, 0, 2, 0, 10, 0, 2, 0, 0, 0};
   int count = 0;
-  owner.AwaitConnection();
+  Protocol::AuthPacket ap;
   while (1) {
-    if(owner.AwaitStream(2)){
-      for_each(owner.streamReceived.begin(), owner.streamReceived.end(), [](const uint8_t& val)->void{ std::printf("%c ", val); });
-      owner.streamReceived.clear();
+    // TCP
+    if(owner.AwaitStreamPacket()){
+      std::cout << std::endl << "======================================================== GET DATA START SEQ :" << count << std::endl;
+      for (auto iter = owner.streamPacket.begin(); iter != owner.streamPacket.end(); iter++)
+      {
+          if (iter->payload[3] == 1) {
+              std::vector< uint8_t >::iterator it = iter->payload.begin();
+              auto authPkt = std::vector<uint8_t>(it += 4, iter->payload.end());
+              // auth 包
+              ap.UnPack(authPkt);
+              std::cout << "UserName: " << ap.GetUserName() << std::endl;
+              std::cout << "PluginName: " << ap.GetPluginName() << std::endl;
+              std::cout << "DataBaseName: " << ap.GetDatabaseName() << std::endl;
+              OkPacket[3] = iter->payload[3] + 1;
+              iter->connection->SendMessage(OkPacket);
+          } else { 
+            // print packet
+            for (auto it = iter->payload.begin(); it != iter->payload.end(); it++) {
+                std::cout << std::to_string(*it) << ", ";
+            }
+            std::vector< uint8_t >::iterator it = iter->payload.begin();
+            std::cout << std::endl;
+            // cmd type
+            it += 4;
+            std::cout << "cmd type: " << std::to_string(*it) << std::endl;
+            it ++;
+            // cmd param
+            size_t SIZE = iter->payload.size();
+            std::string cmdParam(it, iter->payload.end());
+            std::cout << "cmd param: " << cmdParam << std::endl;
+            if(cmdParam == "SELECT PersonID, LastName, FirstName FROM Persons") {
+                iter->connection->SendMessage(std::vector<uint8_t>{1, 0, 0, 1, 3});
+                iter->connection->SendMessage(std::vector<uint8_t>{54, 0, 0, 2, 3, 100, 101, 102, 2, 100, 98, 7, 80, 101, 114, 115, 111, 110, 115, 7, 80, 101, 114, 115, 111, 110, 115, 8, 80, 101, 114, 115, 111, 110, 73, 68, 8, 80, 101, 114, 115, 111, 110, 73, 68, 12, 63, 0, 11, 0, 0, 0, 3, 3, 0, 0, 0, 0});
+                iter->connection->SendMessage(std::vector<uint8_t>{54, 0, 0, 3, 3, 100, 101, 102, 2, 100, 98, 7, 80, 101, 114, 115, 111, 110, 115, 7, 80, 101, 114, 115, 111, 110, 115, 8, 76, 97, 115, 116, 78, 97, 109, 101, 8, 76, 97, 115, 116, 78, 97, 109, 101, 12, 33, 0, 80, 0, 0, 0, 253, 0, 0, 0, 0, 0});
+                iter->connection->SendMessage(std::vector<uint8_t>{56, 0, 0, 4, 3, 100, 101, 102, 2, 100, 98, 7, 80, 101, 114, 115, 111, 110, 115, 7, 80, 101, 114, 115, 111, 110, 115, 9, 70, 105, 114, 115, 116, 78, 97, 109, 101, 9, 70, 105, 114, 115, 116, 78, 97, 109, 101, 12, 33, 0, 80, 0, 0, 0, 253, 0, 0, 0, 0, 0});
+                iter->connection->SendMessage(std::vector<uint8_t>{5, 0, 0, 5, 254, 0, 0, 2, 0,});
+                iter->connection->SendMessage(std::vector<uint8_t>{15, 0, 0, 6, 4, 45, 50, 51, 56, 5, 90, 104, 111, 110, 103, 3, 76, 101, 105});
+                iter->connection->SendMessage(std::vector<uint8_t>{23, 0, 0, 7, 4, 49, 48, 48, 48, 11, 87, 97, 115, 115, 101, 114, 115, 116, 101, 105, 110, 5, 90, 104, 97, 110, 103});
+                iter->connection->SendMessage(std::vector<uint8_t>{5, 0, 0, 8, 254, 0, 0, 2, 0});
+            } else {
+                // return
+                OkPacket[3] = iter->payload[3] + 1;
+                // print ok packet
+                // for (auto item : OkPacket) {
+                //     std::cout << std::to_string(item) << "| ";
+                // }
+
+                iter->connection->SendMessage(OkPacket);
+            }
+            std::cout << std::endl;
+            std::cout << std::flush  << std::endl;
+          }
+      }
+      std::cout << std::endl << "======================================================== GET DATA END SEQ :" << count << std::endl;
+      count ++;
+      owner.streamPacket.clear();
     }
-    count ++;
-    std::printf("count: %d \n", count);
-    sleep(1);
+    // sleep(1);
   }
   return 0;
 }

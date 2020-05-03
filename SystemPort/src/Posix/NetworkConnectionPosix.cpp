@@ -22,6 +22,7 @@
 #include <sys/time.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <algorithm>
 
 #ifndef MSG_NOSIGNAL
 #define MSG_NOSIGNAL 0

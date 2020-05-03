@@ -4,7 +4,12 @@ SET OUTPUT = 'test_foreign.out';
 
 CREATE TABLE Persons ( PersonID int PRIMARY KEY, Name varchar(20));
 
-CREATE TABLE Conn ( ConnID int, Name varchar(20), FOREIGN KEY (ConnID) REFERENCES Persons(PersonID));
+CREATE TABLE Conn ( 
+    ConnID int, 
+    Name varchar(20), 
+    FOREIGN KEY (ConnID) 
+    REFERENCES Persons(PersonID)
+);
 
 SHOW TABLE Persons;
 SHOW TABLE Conn;
