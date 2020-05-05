@@ -1,3 +1,13 @@
+/**
+ *  @file main.cpp
+ *  
+ *  tinydb 主程序 v0.0.1
+ *      
+ *  make it work! 一个有很多潜藏 bug 的版本。
+ * 
+ *  Copyright © 2020 by LiuJ
+ */
+
 #include <string.h>
 #include <iostream>
 #include <string>
@@ -6,17 +16,75 @@
 #include <condition_variable>
 #include <mutex>
 #include <SystemPort/NetworkEndpoint.hpp>
+#include <SystemPort/File.hpp>
 #include <iostream>
 #include <unistd.h>
 #include <netinet/ip.h>
 #include <sys/socket.h>
 #include <algorithm>
-#include "parser/execute.h"
 #include <protocol/Greeting.hpp>
 #include <protocol/Auth.hpp>
+#include <CppStringPlus/CppStringPlus.hpp>
+#include "parser/parser.h"
+#include "database/dbms.h"
 
 #define IPV4_ADDRESS_IN_SOCKADDR sin_addr.s_addr
 #define SOCKADDR_LENGTH_TYPE socklen_t
+
+template<typename T, typename DataDeleter>
+void free_linked_list(linked_list_t *linked_list, DataDeleter data_deleter)
+{
+	for(linked_list_t *l_ptr = linked_list; l_ptr; )
+	{
+		T* data = (T*)l_ptr->data;
+		data_deleter(data);
+		linked_list_t *tmp = l_ptr;
+		l_ptr = l_ptr->next;
+		free(tmp);
+	}
+}
+
+void expression::free_exprnode(expr_node_t *expr)
+{
+	if(!expr) return;
+	if(expr->op == OPERATOR_NONE)
+	{
+		switch(expr->term_type)
+		{
+			case TERM_STRING:
+				free(expr->val_s);
+				break;
+			case TERM_COLUMN_REF:
+				free(expr->column_ref->table);
+				free(expr->column_ref->column);
+				free(expr->column_ref);
+				break;
+			case TERM_LITERAL_LIST:
+				free_linked_list<expr_node_t>(
+					expr->literal_list,
+					expression::free_exprnode
+				);
+				break;
+			default:
+				break;
+		}
+	} else {
+		free_exprnode(expr->left);
+		free_exprnode(expr->right);
+	}
+
+	free(expr);
+}
+
+void free_column_ref(column_ref_t *cref)
+{
+	if(!cref) return;
+	free(cref->column);
+	free(cref->table);
+	free(cref);
+}
+
+bool fill_table_header(table_header_t *header, const table_def_t *table);
 
 struct Packet {
 
@@ -58,7 +126,8 @@ struct StreamPacket {
 
 struct Owner {
 
-    std::condition_variable_any condition; // https://www.cnblogs.com/haippy/p/3252041.html
+    // https://www.cnblogs.com/haippy/p/3252041.html
+    std::condition_variable_any condition; 
 
     /**
      *  This is used to synchronize access to the class.
@@ -121,7 +190,6 @@ struct Owner {
             lock,
             std::chrono::seconds(1),
             [this] {
-                // std::printf("Check streamPacket... \n");
                 return !streamPacket.empty();
             }
         );
@@ -133,7 +201,6 @@ struct Owner {
             lock,
             std::chrono::seconds(1),
             [this]{
-                // std::printf("Check is client connected... \n");
                 return !connections.empty();
             }
         );
@@ -230,37 +297,20 @@ struct Owner {
 
 };
 
-
 extern "C" char run_parser(const char *input);
 
 void free_all(int num) {
-  execute_quit();
+  dbms::get_instance()->close_database();
   printf("exit successful!");
   exit(0);
 }
 
 int main(int argc, char *argv[])
 {
-  std::string userInput;
-  printf("WELCOME TO TINY DB!\n");
-  printf(">> ");
-  signal(SIGINT, free_all);
 
-//   while(getline(std::cin, userInput)) {
-//       if (userInput == "quit") {
-//         break;
-//       }
-//       std::vector < uint8_t > bytes(userInput.begin(), userInput.end());
-//       for (auto c: bytes) {
-//         std::cout << std::to_string(c) << ", ";
-//       }
-//       run_parser(userInput.c_str());
-//       printf(">> ");
-//   }
-  // std::cout << "close" << std::endl;
-  // // close db
-  // execute_quit();
-   // Set up the NetworkEndpoint
+  printf("WELCOME TO TINY DB!\n");
+  signal(SIGINT, free_all);
+  // Set up the NetworkEndpoint
   SystemAbstractions::NetworkEndpoint endpoint;
   Owner owner;
   Protocol::GreetingPacket gp(1, "TinyDB-v0.0.1");
@@ -292,17 +342,16 @@ int main(int argc, char *argv[])
       0,
       12306
   );
-  
-  const std::string messageAsString("+OK\r\n");
-  const std::vector< uint8_t > messageAsVector(messageAsString.begin(), messageAsString.end());
-  const std::vector< uint8_t > GreetingPacket{74, 0, 0, 0, 10, 70, 97, 107, 101, 68, 66, 0, 1, 0, 0, 0, 102, 116, 41, 51, 66, 52, 110, 64, 0, 13, 162, 33, 2, 0, 9, 1, 21, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 45, 51, 83, 62, 28, 73, 47, 89, 16, 110, 12, 38, 0, 109, 121, 115, 113, 108, 95, 110, 97, 116, 105, 118, 101, 95, 112, 97, 115, 115, 119, 111, 114, 100, 0};
-  std::vector< uint8_t > OkPacket = {7, 0, 0, 2, 0, 10, 0, 2, 0, 0, 0};
-  int count = 0;
+
+  // 创建数据目录
+  std::string dataDir =  SystemAbstractions::File::GetExeParentDirectory() + "/data";
+  SystemAbstractions::File::CreateDirectory(dataDir);
+  std::vector< uint8_t > OkPacket = {7, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0};
+  // 客户端认证包
   Protocol::AuthPacket ap;
   while (1) {
     // TCP
     if(owner.AwaitStreamPacket()){
-      std::cout << std::endl << "======================================================== GET DATA START SEQ :" << count << std::endl;
       for (auto iter = owner.streamPacket.begin(); iter != owner.streamPacket.end(); iter++)
       {
           if (iter->payload[3] == 1) {
@@ -325,39 +374,183 @@ int main(int argc, char *argv[])
             // cmd type
             it += 4;
             std::cout << "cmd type: " << std::to_string(*it) << std::endl;
+            uint8_t cmdType = *it;
             it ++;
             // cmd param
             size_t SIZE = iter->payload.size();
             std::string cmdParam(it, iter->payload.end());
+            cmdParam.push_back(';');
             std::cout << "cmd param: " << cmdParam << std::endl;
-            if(cmdParam == "SELECT PersonID, LastName, FirstName FROM Persons") {
-                iter->connection->SendMessage(std::vector<uint8_t>{1, 0, 0, 1, 3});
-                iter->connection->SendMessage(std::vector<uint8_t>{54, 0, 0, 2, 3, 100, 101, 102, 2, 100, 98, 7, 80, 101, 114, 115, 111, 110, 115, 7, 80, 101, 114, 115, 111, 110, 115, 8, 80, 101, 114, 115, 111, 110, 73, 68, 8, 80, 101, 114, 115, 111, 110, 73, 68, 12, 63, 0, 11, 0, 0, 0, 3, 3, 0, 0, 0, 0});
-                iter->connection->SendMessage(std::vector<uint8_t>{54, 0, 0, 3, 3, 100, 101, 102, 2, 100, 98, 7, 80, 101, 114, 115, 111, 110, 115, 7, 80, 101, 114, 115, 111, 110, 115, 8, 76, 97, 115, 116, 78, 97, 109, 101, 8, 76, 97, 115, 116, 78, 97, 109, 101, 12, 33, 0, 80, 0, 0, 0, 253, 0, 0, 0, 0, 0});
-                iter->connection->SendMessage(std::vector<uint8_t>{56, 0, 0, 4, 3, 100, 101, 102, 2, 100, 98, 7, 80, 101, 114, 115, 111, 110, 115, 7, 80, 101, 114, 115, 111, 110, 115, 9, 70, 105, 114, 115, 116, 78, 97, 109, 101, 9, 70, 105, 114, 115, 116, 78, 97, 109, 101, 12, 33, 0, 80, 0, 0, 0, 253, 0, 0, 0, 0, 0});
-                iter->connection->SendMessage(std::vector<uint8_t>{5, 0, 0, 5, 254, 0, 0, 2, 0,});
-                iter->connection->SendMessage(std::vector<uint8_t>{15, 0, 0, 6, 4, 45, 50, 51, 56, 5, 90, 104, 111, 110, 103, 3, 76, 101, 105});
-                iter->connection->SendMessage(std::vector<uint8_t>{23, 0, 0, 7, 4, 49, 48, 48, 48, 11, 87, 97, 115, 115, 101, 114, 115, 116, 101, 105, 110, 5, 90, 104, 97, 110, 103});
-                iter->connection->SendMessage(std::vector<uint8_t>{5, 0, 0, 8, 254, 0, 0, 2, 0});
+            // parser packet
+            /**
+             *  不支持的语句
+             */
+            if(cmdParam != "select @@version_comment limit 1;" && cmdParam != "SELECT DATABASE();" && cmdParam != "show databases;" && cmdParam != "show tables;") {
+                switch (cmdType)
+                {
+                case 2:
+                    // switch db
+                    run_parser(std::string("USE " + cmdParam).c_str());
+                    switch (result.type)
+                    {
+                    case SQL_USE_DATABASE: {
+                        printf("execute_use_database\n");
+                        std::string dbName((char*)result.param);
+                        std::cout << dbName << std::endl;
+                        dbms::get_instance()->switch_database(dbName.c_str(), iter->connection);
+                        result.type = SQL_RESET;
+                        free((char*)result.param);
+                    } break;
+                    default:
+                        // return
+                        OkPacket[3] = iter->payload[3] + 1;
+                        iter->connection->SendMessage(OkPacket);
+                        result.type = SQL_RESET;
+                        break;
+                    }
+                    break;
+                case 3:
+                    // query
+                    {
+                        run_parser(cmdParam.c_str());
+                        switch (result.type)
+                        {
+                        case SQL_CREATE_DATABASE: {
+                            printf("execute_create_database\t");
+                            std::string dbName((char*)result.param);
+                            std::cout << dbName << std::endl;
+                            dbms::get_instance()->create_database(dbName.c_str(), iter->connection);
+                            result.type = SQL_RESET;
+                            free((char*)result.param);
+                        } break;
+                        case SQL_DROP_DATABASE: {
+                            printf("execute_drop_database\t");
+                            std::string dbName((char*)result.param);
+                            std::cout << dbName << std::endl;
+                            dbms::get_instance()->drop_database(dbName.c_str(), iter->connection);
+                            free((char*)result.param);
+                        } break;
+                        case SQL_SHOW_DATABASE: {
+                            printf("execute_show_database\n");
+                            std::string dbName((char*)result.param);
+                            std::cout << dbName << std::endl;
+                            dbms::get_instance()->show_database(dbName.c_str(), iter->connection);
+                            result.type = SQL_RESET;
+                            free((char*)result.param);                            
+                        } break;
+                        case SQL_CREATE_TABLE: {
+                            printf("execute_create_table\n");
+                            table_def_t *table = (table_def_t*)result.param;
+                            table_header_t *header = new table_header_t;
+                            std::cout << "T name:" << table->name << std::endl;
+                            if(fill_table_header(header, table)) {
+                                dbms::get_instance()->create_table(header, iter->connection);
+                            } else {
+                                printf("[Error] Fail to create table!\t");
+                            }
+                            // free resources
+                            delete header;
+                            free(table->name);
+                            free_linked_list<table_constraint_t>(table->constraints, [](table_constraint_t *data) {
+                            	expression::free_exprnode(data->check_cond);
+                            	free_column_ref(data->column_ref);
+                            	free_column_ref(data->foreign_column_ref);
+                            	free(data);
+                            } );
+                            for(field_item_t *it = table->fields; it; )
+                            {
+                            	field_item_t *tmp = it;
+                            	free(it->name);
+                            	expression::free_exprnode(it->default_value);
+                            	it = it->next;
+                            	free(tmp);
+                            }
+                            free((void*)table);
+                            result.type = SQL_RESET;
+                        } break;
+                        case SQL_INSERT: {
+                            printf("execute_insert\n");
+                            insert_info_t *info = (insert_info_t*)result.param;
+                            dbms::get_instance()->insert_rows(info, iter->connection);
+                            // free resources
+                            free(info->table);
+                            free_linked_list<column_ref_t>(info->columns, free_column_ref);
+                            free_linked_list<linked_list_t>(info->values, [](linked_list_t *expr_list) {
+                                free_linked_list<expr_node_t>(expr_list, expression::free_exprnode);
+                            } );
+                            free((void*)info);
+                            result.type = SQL_RESET;
+                        } break;
+                        case SQL_SELECT: {
+                            printf("execute_select\n");
+                            select_info_t *select_info = (select_info_t*)result.param;
+                            dbms::get_instance()->select_rows(select_info, iter->connection);
+                            expression::free_exprnode(select_info->where);
+                            free_linked_list<expr_node_t>(select_info->exprs, expression::free_exprnode);
+                            free_linked_list<table_join_info_t>(select_info->tables, [](table_join_info_t *data) {
+                                free(data->table);
+                                if(data->join_table)
+                                    free(data->join_table);
+                                if(data->alias)
+                                    free(data->alias);
+                                expression::free_exprnode(data->cond);
+                                free(data);
+                            });	
+                            free((void*)select_info);
+                            result.type = SQL_RESET;
+                        } break;
+                        case SQL_UPDATE: {
+                            printf("execute_update\n");
+                            update_info_t *update_info = (update_info_t*)result.param;
+                            dbms::get_instance()->update_rows(update_info, iter->connection);
+                            free(update_info->table);
+                            free_column_ref(update_info->column_ref);
+                            expression::free_exprnode(update_info->where);
+                            expression::free_exprnode(update_info->value);
+                            free((void*)update_info);
+                            result.type = SQL_RESET;
+                        } break;
+                        case SQL_DELETE: {
+                            printf("execute_delete\n");
+                            delete_info_t *delete_info = (delete_info_t*)result.param;
+                            dbms::get_instance()->delete_rows(delete_info, iter->connection);
+                            free(delete_info->table);
+                            expression::free_exprnode(delete_info->where);
+                            free((void*)delete_info); 
+                            result.type = SQL_RESET;
+                        } break;
+                        case SQL_CREATE_INDEX: {
+                            printf("execute_create_index\n");
+                            std::string tAc((char*)result.param);
+                            std::cout << tAc << std::endl;
+                            std::vector< std::string > items = CppStringPlus::Split(tAc, '$');
+                            std::string table_name = items.front();
+                            items.erase(items.begin());
+                            std::string col_name = items.front();
+                            dbms::get_instance()->create_index(table_name.c_str(), col_name.c_str(), iter->connection);
+                            result.type = SQL_RESET;
+                        } break;
+                        default:
+                            // return
+                            OkPacket[3] = iter->payload[3] + 1;
+                            iter->connection->SendMessage(OkPacket);
+                            result.type = SQL_RESET;
+                        } break;
+                    }
+                    break;     
+                default:
+                    break;
+                }
             } else {
-                // return
-                OkPacket[3] = iter->payload[3] + 1;
-                // print ok packet
-                // for (auto item : OkPacket) {
-                //     std::cout << std::to_string(item) << "| ";
-                // }
-
-                iter->connection->SendMessage(OkPacket);
+                    OkPacket[3] = iter->payload[3] + 1;
+                    iter->connection->SendMessage(OkPacket);
             }
             std::cout << std::endl;
             std::cout << std::flush  << std::endl;
           }
       }
-      std::cout << std::endl << "======================================================== GET DATA END SEQ :" << count << std::endl;
-      count ++;
       owner.streamPacket.clear();
     }
-    // sleep(1);
   }
   return 0;
 }

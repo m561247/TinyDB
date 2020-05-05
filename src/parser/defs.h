@@ -149,6 +149,33 @@ typedef struct table_join_info_t {
 	expr_node_t *cond;
 } table_join_info_t;
 
+typedef enum {
+	SQL_CREATE_DATABASE = 0,
+	SQL_USE_DATABASE,
+	SQL_DROP_DATABASE,
+	SQL_SHOW_DATABASE,
+	SQL_CREATE_TABLE,
+	SQL_DROP_TABLE,
+	SQL_SHOW_TABLE,
+	SQL_INSERT,
+	SQL_SELECT,
+	SQL_UPDATE,
+	SQL_DELETE,
+	SQL_CREATE_INDEX,
+	SQL_DROP_INDEX,
+	SQL_SWITCH_OUTPUT,
+	SQL_QUIT,
+	SQL_RESET
+} sql_type_t;
+
+/**
+ *  Parser 转换结果
+ */
+typedef struct parser_result_t {
+	sql_type_t type;
+	void *param;
+} parser_result_t;
+
 #ifdef __cplusplus
 };
 #endif

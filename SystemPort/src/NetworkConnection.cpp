@@ -12,7 +12,7 @@
 #include <inttypes.h>
 #include <CppStringPlus/CppStringPlus.hpp>
 #include <SystemPort/NetworkConnection.hpp>
-
+#include <iostream>
 namespace SystemAbstractions {
 
     NetworkConnection::~NetworkConnection() noexcept {
@@ -64,6 +64,9 @@ namespace SystemAbstractions {
     }
 
     void NetworkConnection::SendMessage(const std::vector< uint8_t >& message) {
+        for (auto it : message) {
+            std::cout << std::to_string(it) << ",,, ";
+        }
         impl_->SendMessage(message);
     }
 

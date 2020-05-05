@@ -105,7 +105,6 @@ TEST(ProcotolTests, RowUnPack) {
 TEST(ProtocolTests, OkPack) {
 
     Protocol::OkPacket okPack;
-
     std::vector<uint8_t> outPut = okPack.Pack(10, 0, 2, 0);
 
     for(auto packet : outPut) {

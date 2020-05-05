@@ -11,6 +11,7 @@
 
 #include <stdint.h>
 #include <string>
+#include <vector>
 
 namespace CppStringPlus {
 
@@ -56,6 +57,37 @@ namespace CppStringPlus {
     ToIntegerResult ToInteger(
         const std::string& numberString,
         intmax_t& number
+    );
+    /**
+     * This method makes a copy of a string and removes any whitespace
+     * from the front and back of the copy.
+     *
+     * @param[in] s
+     *     This is the string to trim.
+     *
+     * @return
+     *     The trimmed string is returned.
+     */
+    std::string Trim(const std::string& s);
+
+    /**
+     * This function breaks the given string at each instance of the
+     * given delimiter, returning the pieces as a collection of substrings.
+     * The delimiter characters are removed.
+     *
+     * @param[in] s
+     *     This is the string to split.
+     *
+     * @param[in] d
+     *     This is the delimiter character at which to split the string.
+     *
+     * @return
+     *     The collection of substrings that result from breaking the given
+     *     string at each delimiter character is returned.
+     */
+    std::vector< std::string > Split(
+        const std::string& s,
+        char d
     );
 
 } // namespace CppStringPlus

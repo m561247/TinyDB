@@ -78,9 +78,9 @@ public:
 	// get the record R such that R.rid = rid
 	record_manager get_record_ptr(int rid, bool dirty=false);
 
-	void dump_header(FILE *f);
-	void dump_record(FILE *f, int rid);
-	void dump_record(FILE *f, record_manager *rm);
+	void dump_header(FILE *f, std::vector<std::string>& heads);
+	void dump_record(FILE *f, int rid, std::vector<std::string>& row_);
+	void dump_record(FILE *f, record_manager *rm, std::vector<std::string>& row_);
 
 private:
 	bool check_constraints(const char *buf);

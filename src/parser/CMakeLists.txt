@@ -24,13 +24,13 @@ add_library(sql_parser
 
 set(SOURCE
 	${SOURCE}
-	${CMAKE_CURRENT_SOURCE_DIR}/execute.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/parser.cpp
 	PARENT_SCOPE
 )
 
 set(HEADERS
 	${HEADERS}
 	${CMAKE_CURRENT_SOURCE_DIR}/defs.h
-	${CMAKE_CURRENT_SOURCE_DIR}/execute.h
+	${CMAKE_CURRENT_SOURCE_DIR}/parser.h
 	PARENT_SCOPE
 )

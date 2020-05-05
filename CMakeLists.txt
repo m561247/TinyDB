@@ -37,7 +37,8 @@ set(SOURCE
 	src/index/index.cpp
 )
 
-set(HEADERS
+set(
+	HEADERS
 	${HEADERS}
 )
 
@@ -54,10 +55,16 @@ add_subdirectory(CppStringPlus)
 add_subdirectory(SystemPort)
 add_subdirectory(protocol)
 
-add_library(${CMAKE_PROJECT_NAME}_lib ${SOURCE} ${HEADERS})
+add_library(${CMAKE_PROJECT_NAME}_static STATIC ${SOURCE} ${HEADERS})
+target_link_libraries(${CMAKE_PROJECT_NAME}_static 
+	SystemPort
+	protocol
+	CppStringPlus
+)
+
 add_executable(${CMAKE_PROJECT_NAME} src/main.cpp)
-target_link_libraries(${CMAKE_PROJECT_NAME} 
+target_include_directories(${CMAKE_PROJECT_NAME} PUBLIC include)
+target_link_libraries(${CMAKE_PROJECT_NAME} PUBLIC
 					  sql_parser
-					  ${CMAKE_PROJECT_NAME}_lib
-					  SystemPort
-					  protocol)
+					  ${CMAKE_PROJECT_NAME}_static
+					  )

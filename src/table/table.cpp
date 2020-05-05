@@ -141,8 +141,8 @@ bool table_manager::open(const char *table_name)
 {
 	if(is_open) return false;
 	tname = table_name;
-	std::string thead = tname + ".thead";
-	std::string tdata = tname + ".tdata";
+	std::string thead = "data/" + tname + ".thead";
+	std::string tdata = "data/" + tname + ".tdata";
 
 	std::ifstream ifs(thead, std::ios::binary);
 	ifs.read((char*)&header, sizeof(header));
@@ -161,7 +161,7 @@ bool table_manager::create(const char *table_name, const table_header_t *header)
 {
 	if(is_open) return false;
 	tname = table_name;
-	std::string tdata = tname + ".tdata";
+	std::string tdata = "data/" + tname + ".tdata";
 
 	pg = std::make_shared<pager>(tdata.c_str());
 	btr = std::make_shared<int_btree>(pg.get(), 0);
@@ -180,8 +180,8 @@ void table_manager::drop()
 {
 	if(!is_open) return;
 	close();
-	std::string thead = tname + ".thead";
-	std::string tdata = tname + ".tdata";
+	std::string thead = "data/" + tname + ".thead";
+	std::string tdata = "data/" + tname + ".tdata";
 	std::remove(thead.c_str());
 	std::remove(tdata.c_str());
 }
@@ -192,8 +192,8 @@ void table_manager::close()
 
 	if(!is_mirror)
 	{
-		std::string thead = tname + ".thead";
-		std::string tdata = tname + ".tdata";
+		std::string thead = "data/" + tname + ".thead";
+		std::string tdata = "data/" + tname + ".tdata";
 
 		header.index_root[header.main_index] = btr->get_root_page_id();
 		free_indices();
@@ -370,7 +370,7 @@ record_manager table_manager::get_record_ptr(int rid, bool dirty)
 	else return record_manager(pg.get());
 }
 
-void table_manager::dump_header(FILE *f)
+void table_manager::dump_header(FILE *f, std::vector<std::string>& heads)
 {
 	for(int i = 0; i < header.col_num - 1; ++i)
 	{
@@ -380,16 +380,17 @@ void table_manager::dump_header(FILE *f)
 		}
 		std::fprintf(f, "%s.%s", header.table_name, header.col_name[i]);
 		printf("%s.%s", header.table_name, header.col_name[i]);
+		heads.insert(heads.begin(), std::string(header.col_name[i]));
 	}
 }
 
-void table_manager::dump_record(FILE *f, int rid)
+void table_manager::dump_record(FILE *f, int rid, std::vector<std::string>& row_)
 {
 	record_manager rec = get_record_ptr(rid);
-	dump_record(f, &rec);
+	dump_record(f, &rec, row_);
 }
 
-void table_manager::dump_record(FILE *f, record_manager *rm)
+void table_manager::dump_record(FILE *f, record_manager *rm, std::vector<std::string>& row_)
 {
 	rm->seek(0);
 	rm->read(tmp_cache, tmp_record_size);
@@ -404,6 +405,7 @@ void table_manager::dump_record(FILE *f, record_manager *rm)
 		{
 			std::fprintf(f, "NULL");
 			printf("NULL");
+			row_.insert(row_.begin(), "NULL");
 			continue;
 		}
 
@@ -413,14 +415,17 @@ void table_manager::dump_record(FILE *f, record_manager *rm)
 			case COL_TYPE_INT:
 				std::fprintf(f, "%d", *(int*)buf);
 				printf("%d", *(int*)buf);
+				row_.insert(row_.begin(), std::to_string(*(int*)buf));
 				break;
 			case COL_TYPE_FLOAT:
 				std::fprintf(f, "%f", *(float*)buf);
 				printf("%f", *(float*)buf);
+				row_.insert(row_.begin(), std::to_string(*(float*)buf));
 				break;
 			case COL_TYPE_VARCHAR:
 				std::fprintf(f, "%s", buf);
 				printf("%s", buf);
+				row_.insert(row_.begin(), std::string(buf));
 				break;
 			case COL_TYPE_DATE: {
 				char date_buf[32];
@@ -429,7 +434,8 @@ void table_manager::dump_record(FILE *f, record_manager *rm)
 				std::strftime(date_buf, 32, DATE_TEMPLATE, tm);
 				std::fprintf(f, "%s", date_buf);
 				printf("%s", date_buf);
-				break; 
+				row_.insert(row_.begin(), std::string(date_buf));
+				break;
 				}
 			default:
 				debug_puts("[Error] Data type not supported!");

@@ -278,6 +278,7 @@ namespace SystemAbstractions {
 
     void NetworkConnection::Impl::SendMessage(const std::vector< uint8_t >& message) {
         std::lock_guard< decltype(platform->processingMutex) > lock(platform->processingMutex);
+        
         platform->outputQueue.Enqueue(message);
         platform->processorStateChangeSignal.Set();
     }

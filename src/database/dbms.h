@@ -5,7 +5,10 @@
 #include "../parser/defs.h"
 #include "../expression/expression.h"
 #include <cstdio>
-
+#include <SystemPort/NetworkEndpoint.hpp>
+#include <protocol/Ok.hpp>
+#include <protocol/Field.hpp>
+#include <protocol/Eof.hpp>
 class dbms
 {
 	FILE *output_file;
@@ -17,22 +20,22 @@ public:
 	~dbms();
 
 	void close_database();
-	void show_database(const char *db_name);
-	void switch_database(const char *db_name);
-	void drop_database(const char *db_name);
-	void create_database(const char *db_name);
+	void show_database(const char *db_name, std::shared_ptr< SystemAbstractions::NetworkConnection > newConnection);
+	void switch_database(const char *db_name, std::shared_ptr< SystemAbstractions::NetworkConnection > newConnection);
+	void drop_database(const char *db_name, std::shared_ptr< SystemAbstractions::NetworkConnection > newConnection);
+	void create_database(const char *db_name, std::shared_ptr< SystemAbstractions::NetworkConnection > newConnection);
 
-	void create_table(const table_header_t *header);
+	void create_table(const table_header_t *header, std::shared_ptr< SystemAbstractions::NetworkConnection > newConnection);
 	void show_table(const char *table_name);
-	void drop_table(const char *table_name);
+	void drop_table(const char *table_name, std::shared_ptr< SystemAbstractions::NetworkConnection > newConnection);
 
-	void create_index(const char *tb_name, const char *col_name);
-	void drop_index(const char *tb_name, const char *col_name);
+	void create_index(const char *tb_name, const char *col_name, std::shared_ptr< SystemAbstractions::NetworkConnection > newConnection);
+	void drop_index(const char *tb_name, const char *col_name, std::shared_ptr< SystemAbstractions::NetworkConnection > newConnection);
 
-	void insert_rows(const insert_info_t *info);
-	void delete_rows(const delete_info_t *info);
-	void select_rows(const select_info_t *info);
-	void update_rows(const update_info_t *info);
+	void insert_rows(const insert_info_t *info, std::shared_ptr< SystemAbstractions::NetworkConnection > newConnection);
+	void delete_rows(const delete_info_t *info, std::shared_ptr< SystemAbstractions::NetworkConnection > newConnection);
+	void select_rows(const select_info_t *info, std::shared_ptr< SystemAbstractions::NetworkConnection > newConnection);
+	void update_rows(const update_info_t *info, std::shared_ptr< SystemAbstractions::NetworkConnection > newConnection);
 
 	void switch_select_output(const char *filename);
 
@@ -40,7 +43,9 @@ public:
 		const select_info_t *info,
 		const std::vector<table_manager*> &required_tables,
 		const std::vector<expr_node_t*> &exprs,
-		const std::vector<std::string> &expr_names);
+		const std::vector<std::string> &expr_names, 
+		std::shared_ptr< SystemAbstractions::NetworkConnection > newConnection, 
+		uint8_t seq_);
 
 	bool value_exists(const char *table, const char *column, const char *data);
 

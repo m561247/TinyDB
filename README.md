@@ -1,4 +1,4 @@
-# TiyDB —— A Simple Database
+# TiyDB — 一个用于教学的数据库
 
 ## 编译及运行
 
@@ -8,6 +8,17 @@
 sh build.sh
 ```
 进行项目的编译，编译后的可执行程序在`build/build/tinydb`目录下。
+
+```
+./build/build/tinydb 运行
+```
+默认监听端口 12306，可以直接在安装 MySQL 客户端的机器上直接连接
+
+Centos7 下安装 MySQL 客户端 `yum install mysql`
+
+```
+mysql --host 127.0.0.1 --port 12306 -u root
+```
 
 ## 系统功能
 
@@ -24,7 +35,7 @@ sh build.sh
 
 ### SQL语句
 
-我们支持的SQL语句一共有如下几种
+我们支持的SQL语句一共有如下几种，您可以使用 testsql 目录下的 sql 测试
 
  * 插入语句：`INSERT INTO ... VALUES ...`
  * 删除语句：`DELETE FROM ... WHERE ...`
@@ -33,10 +44,8 @@ sh build.sh
  * 创建数据库：`CREATE DATABASE ...`
  * 删除数据库：`DROP DATABASE ...`
  * 切换数据库：`USE ...`
- * 显示数据库信息：`SHOW DATABASE ...`
  * 创建表：`CREATE TABLE ...`
  * 删除表：`DROP TABLE ...`
- * 显示表信息：`SHOW TABLE ...`
  * 创建索引：`CREATE INDEX ...`
  * 删除索引：`DROP INDEX ...`
 
@@ -93,6 +102,7 @@ CREATE TABLE Infos (
     InfoID int PRIMARY KEY,
     FOREIGN KEY (PersonID) REFERENCES Persons(PersonID)
 );
+
 ```
 ### 多表连接查询
 在SELECT语句中，我们支持任意多表的连接操作，例如
@@ -113,22 +123,29 @@ SELECT * FROM Persons, Infos, Datas WHERE Persons.PersonID = Infos.PersonID AND 
 SELECT * FROM Persons AS P1, Persons AS P2 WHERE P1.PersonID = P2.PersonID;
 ```
 
-## 系统 Demo
+## Demo
 
-![demo001](media/demo.png)
+![1](https://wx2.sbimg.cn/2020/05/05/001.jpg)
+
+![2](https://wx2.sbimg.cn/2020/05/05/002.jpg)
+
+![3](https://wx2.sbimg.cn/2020/05/05/003.jpg)
+
+![4](https://wx2.sbimg.cn/2020/05/05/004.jpg)
 
 ## TODO List
 
-| 模块名                       | 排期    |
-| ---------------------------- | ------- |
-| 兼容 MySQL 协议              | 1 month |
-| 实现 io 多路复用网络模型     | 2 week  |
-| 更换 RocksDB 存储引擎        | 1 month |
-| 实现 Raft 库                 | 1 month |
-| 实现多副本分布式强一致存储层 | 1 month |
-| 开发 Proxy 分离计算层        | 1 month |
-| 开发调度管理层               | 2 month |
+| 模块名                       | 排期    | 进度 |
+| ---------------------------- | ------- | ---- |
+| 兼容 MySQL 协议              | 1 month | Done |
+| 实现 epoll 和多线程          | 2 week  |      |
+| 更换 RocksDB 存储引擎        | 1 month |      |
+| 实现 Raft 库                 | 1 month |      |
+| 实现多副本分布式强一致存储层 | 1 month |      |
+| 开发 Proxy 分离计算层        | 1 month |      |
+| 开发调度管理层               | 2 month |      |
 
 ## Acknowledgments
 
 *  基于项目 TrivialDB 开发
+

@@ -9,7 +9,8 @@
 #include <limits>
 #include <algorithm>
 #include <stdio.h>
-
+#include <iostream>
+#include <CppStringPlus/CppStringPlus.hpp>
 struct __cache_clear_guard
 {
 	~__cache_clear_guard() { expression::cache_clear(); }
@@ -28,11 +29,13 @@ dbms::~dbms()
 
 void dbms::switch_select_output(const char *filename)
 {
+	// 存在 data 子目录下
+	std::string PATH = "data/" + std::string(filename);
 	if(output_file != stdout)
 		std::fclose(output_file);
 	if(std::strcmp(filename, "stdout") == 0)
 		output_file = stdout;
-	else output_file = std::fopen(filename, "w");
+	else output_file = std::fopen(PATH.c_str(), "w");
 }
 
 template<typename Callback>
@@ -443,9 +446,10 @@ void dbms::close_database()
 		delete cur_db;
 		cur_db = nullptr;
 	}
+	std::printf("call closed db ~");
 }
 
-void dbms::switch_database(const char *db_name)
+void dbms::switch_database(const char *db_name, std::shared_ptr< SystemAbstractions::NetworkConnection > newConnection)
 {
 	if(cur_db)
 	{
@@ -453,20 +457,46 @@ void dbms::switch_database(const char *db_name)
 		delete cur_db;
 		cur_db = nullptr;
 	}
-
 	cur_db = new database();
 	cur_db->open(db_name);
+	Protocol::OkPacket okPack;
+    std::vector<uint8_t> outPut = okPack.Pack(0, 0, 2, 0);
+	std::vector< uint8_t > res;
+	res.push_back(outPut.size());
+	res.push_back(0);
+	res.push_back(0);
+	res.push_back(1);
+	res.insert(
+		res.end(),
+		outPut.begin(),
+		outPut.end()
+	);
+	newConnection->SendMessage(res);
 	printf("OK!\n");
 }
 
-void dbms::create_database(const char *db_name)
+void dbms::create_database(const char *db_name, std::shared_ptr< SystemAbstractions::NetworkConnection > newConnection)
 {
 	database db;
 	db.create(db_name);
 	db.close();
+	switch_select_output(db_name);
+	Protocol::OkPacket okPack;
+    std::vector<uint8_t> outPut = okPack.Pack(0, 0, 2, 0);
+	std::vector< uint8_t > res;
+	res.push_back(outPut.size());
+	res.push_back(0);
+	res.push_back(0);
+	res.push_back(1);
+	res.insert(
+		res.end(),
+		outPut.begin(),
+		outPut.end()
+	);
+	newConnection->SendMessage(res);
 }
 
-void dbms::drop_database(const char *db_name)
+void dbms::drop_database(const char *db_name, std::shared_ptr< SystemAbstractions::NetworkConnection > newConnection)
 {
 	if(cur_db && std::strcmp(cur_db->get_name(), db_name) == 0)
 	{
@@ -474,21 +504,45 @@ void dbms::drop_database(const char *db_name)
 		delete cur_db;
 		cur_db = nullptr;
 	}
-
 	database db;
 	db.open(db_name);
 	db.drop();
-	printf("OK!\n");
+	Protocol::OkPacket okPack;
+    std::vector<uint8_t> outPut = okPack.Pack(0, 0, 2, 0);
+	std::vector< uint8_t > res;
+	res.push_back(outPut.size());
+	res.push_back(0);
+	res.push_back(0);
+	res.push_back(1);
+	res.insert(
+		res.end(),
+		outPut.begin(),
+		outPut.end()
+	);
+	newConnection->SendMessage(res);
 }
 
-void dbms::show_database(const char *db_name)
+void dbms::show_database(const char *db_name, std::shared_ptr< SystemAbstractions::NetworkConnection > newConnection)
 {
 	database db;
 	db.open(db_name);
 	db.show_info();
+	Protocol::OkPacket okPack;
+    std::vector<uint8_t> outPut = okPack.Pack(0, 0, 2, 0);
+	std::vector< uint8_t > res;
+	res.push_back(outPut.size());
+	res.push_back(0);
+	res.push_back(0);
+	res.push_back(1);
+	res.insert(
+		res.end(),
+		outPut.begin(),
+		outPut.end()
+	);
+	newConnection->SendMessage(res);
 }
 
-void dbms::drop_table(const char *table_name)
+void dbms::drop_table(const char *table_name, std::shared_ptr< SystemAbstractions::NetworkConnection > newConnection)
 {
 	if(assert_db_open())
 		cur_db->drop_table(table_name);
@@ -509,13 +563,26 @@ void dbms::show_table(const char* table_name)
 	}
 }
 
-void dbms::create_table(const table_header_t *header)
+void dbms::create_table(const table_header_t *header, std::shared_ptr< SystemAbstractions::NetworkConnection > newConnection)
 {
 	if(assert_db_open())
 		cur_db->create_table(header);
+	Protocol::OkPacket okPack;
+    std::vector<uint8_t> outPut = okPack.Pack(0, 0, 2, 0);
+	std::vector< uint8_t > res;
+	res.push_back(outPut.size());
+	res.push_back(0);
+	res.push_back(0);
+	res.push_back(1);
+	res.insert(
+		res.end(),
+		outPut.begin(),
+		outPut.end()
+	);
+	newConnection->SendMessage(res);
 }
 
-void dbms::update_rows(const update_info_t *info)
+void dbms::update_rows(const update_info_t *info, std::shared_ptr< SystemAbstractions::NetworkConnection > newConnection)
 {
 	if(!assert_db_open())
 		return;
@@ -553,12 +620,24 @@ void dbms::update_rows(const update_info_t *info)
 		return;
 	} catch(...) {
 	}
-
+	Protocol::OkPacket okPack;
+    std::vector<uint8_t> outPut = okPack.Pack(succ_count, 0, 2, 0);
+	std::vector< uint8_t > res;
+	res.push_back(outPut.size());
+	res.push_back(0);
+	res.push_back(0);
+	res.push_back(1);
+	res.insert(
+		res.end(),
+		outPut.begin(),
+		outPut.end()
+	);
+	newConnection->SendMessage(res);
 	std::printf("[Info] %d row(s) updated, %d row(s) failed.\n",
 			succ_count, fail_count);
 }
 
-void dbms::select_rows(const select_info_t *info)
+void dbms::select_rows(const select_info_t *info, std::shared_ptr< SystemAbstractions::NetworkConnection > newConnection)
 {
 	if(!assert_db_open())
 		return;
@@ -600,6 +679,8 @@ void dbms::select_rows(const select_info_t *info)
 		expr_names.push_back(expression::to_string(expr));
 	}
 
+	std::vector<std::string> headers;
+	std::vector< std::vector<std::string> > rows;
 	// output header info
 	for(size_t i = 0; i < exprs.size(); ++i)
 	{
@@ -609,6 +690,8 @@ void dbms::select_rows(const select_info_t *info)
 		}
 		std::fprintf(output_file, "%s", expr_names[i].c_str());
 		printf("%s", expr_names[i].c_str());
+		// headers.push_back(expr_names[i]);
+		headers.insert(headers.begin(), expr_names[i]);
 	}
 
 	if(exprs.size() == 0)
@@ -619,12 +702,60 @@ void dbms::select_rows(const select_info_t *info)
 				std::fprintf(output_file, ",");
 				printf(",");
 			}
-			required_tables[i]->dump_header(output_file);
+			required_tables[i]->dump_header(output_file, headers);
 		}
 	}
 
 	std::fprintf(output_file, "\n");
 	printf("\n");
+
+	// rows packet
+	std::vector<uint8_t> feildCountPacket;
+	feildCountPacket.push_back(1);
+	feildCountPacket.push_back(0);
+	feildCountPacket.push_back(0);
+	feildCountPacket.push_back(1);
+	feildCountPacket.push_back(static_cast<uint8_t>(headers.size()));
+	
+	newConnection->SendMessage(feildCountPacket);
+	uint8_t seq = 1;
+	for(auto h : headers) {
+		seq ++;
+		linked_list_t *table_l = info->tables;
+		table_join_info_t *table_info = (table_join_info_t*)table_l->data;
+		std::cout << h << ",h ";
+
+		Protocol::FieldPacket newFieldPack(h, static_cast< uint32_t >(6165), std::string(table_info->table), 
+        std::string(table_info->table), std::string(cur_db->get_name()), h, 80,
+        33, 0, 0);
+		std::vector< uint8_t > fieldPack = newFieldPack.Pack();
+		std::vector< uint8_t > outPack;
+		outPack.push_back(fieldPack.size());
+		outPack.push_back(0);
+		outPack.push_back(0);
+		outPack.push_back(seq);
+		outPack.insert(
+			outPack.end(),
+			fieldPack.begin(),
+			fieldPack.end()
+		);
+		newConnection->SendMessage(outPack);
+	}
+	// // EOF
+    Protocol::EofPacket eof(0, 2);
+    std::vector< uint8_t > eofPacket = eof.Pack();
+	seq ++; // 254, 0, 0, 2, 0
+	std::vector< uint8_t > outPack;
+		outPack.push_back(eofPacket.size());
+		outPack.push_back(0);
+		outPack.push_back(0);
+		outPack.push_back(seq);
+		outPack.insert(
+			outPack.end(),
+			eofPacket.begin(),
+			eofPacket.end()
+		);
+	newConnection->SendMessage(outPack);
 
 	if(is_aggregate)
 	{
@@ -632,7 +763,9 @@ void dbms::select_rows(const select_info_t *info)
 			info,
 			required_tables,
 			exprs,
-			expr_names
+			expr_names,
+			newConnection,
+			seq
 		);
 
 		return;
@@ -640,11 +773,13 @@ void dbms::select_rows(const select_info_t *info)
 
 	// iterate records
 	int counter = 0;
+
 	iterate(required_tables, info->where,
 		[&](const std::vector<table_manager*> &tables,
 			const std::vector<record_manager*> &records,
 			const std::vector<int>& )
 		{
+			std::vector<std::string> row;
 			for(size_t i = 0; i < exprs.size(); ++i)
 			{
 				expression ret;
@@ -665,18 +800,22 @@ void dbms::select_rows(const select_info_t *info)
 					case TERM_INT:
 						std::fprintf(output_file, "%d", ret.val_i);
 						printf("%d", ret.val_i);
+						row.insert(row.begin(), std::to_string(ret.val_i));
             break;
 					case TERM_FLOAT:
 						std::fprintf(output_file, "%f", ret.val_f);
 						printf("%f", ret.val_f);
+						row.insert(row.begin(), std::to_string(ret.val_f));
             break;
 					case TERM_STRING:
 						std::fprintf(output_file, "%s", ret.val_s);
-            printf("%s", ret.val_s);
+					    row.insert(row.begin(), ret.val_s);
+					    printf("%s", ret.val_s);
 						break;
 					case TERM_BOOL:
 						std::fprintf(output_file, "%s", ret.val_b ? "TRUE" : "FALSE");
 						printf("%s", (ret.val_b ? "TRUE" : "FALSE"));
+						row.insert(row.begin(), ret.val_b ? "TRUE" : "FALSE");
             break;
 					case TERM_DATE: {
 						char date_buf[32];
@@ -685,17 +824,19 @@ void dbms::select_rows(const select_info_t *info)
 						std::strftime(date_buf, 32, DATE_TEMPLATE, tm);
 						printf("%s", date_buf);
 						std::fprintf(output_file, "%s", date_buf);
+						row.insert(row.begin(), date_buf);
 						break; 
 					}
 					case TERM_NULL:
 						std::fprintf(output_file, "NULL");
+						row.insert(row.begin(), "NULL");
 						printf("NULL");
             break;
 					default:
 						debug_puts("[Error] Data type not supported!");
 				}
 			}
-
+		
 			if(exprs.size() == 0)
 			{
 				for(size_t i = 0; i < tables.size(); ++i)
@@ -704,17 +845,60 @@ void dbms::select_rows(const select_info_t *info)
 						std::fprintf(output_file, ",");
 						printf(",");
 					}
-					tables[i]->dump_record(output_file, records[i]);
+					tables[i]->dump_record(output_file, records[i], row);
 				}
+				rows.push_back(row);
+			} else {
+				rows.push_back(row);
 			}
 			std::fprintf(output_file, "\n");
 			printf("\n");
 			++counter;
+			
 			return true;
 		}
 	);
 
 	std::printf("[Info] %d row(s) selected.\n", counter);
+
+	for(auto r : rows) {
+		seq ++;
+		std::cout << std::endl;
+		for(auto item : r) {
+			std::cout  << item << "  | ";
+		}
+		std::cout << std::endl;
+		Protocol::RowPacket rowPack(r);
+		std::vector< uint8_t > rowPacket = rowPack.Pack();
+		std::vector< uint8_t > outPack;
+		outPack.push_back(rowPacket.size());
+		outPack.push_back(0);
+		outPack.push_back(0);
+		outPack.push_back(seq);
+		outPack.insert(
+			outPack.end(),
+			rowPacket.begin(),
+			rowPacket.end()
+		);
+		newConnection->SendMessage(outPack);
+	}
+
+	seq ++;
+	// EOF
+	Protocol::EofPacket eofBack(0, 2);
+	std::vector< uint8_t > eofBackPacket = eofBack.Pack();
+	std::vector< uint8_t > outPack1;
+		outPack1.push_back(eofBackPacket.size());
+		outPack1.push_back(0);
+		outPack1.push_back(0);
+		outPack1.push_back(seq);
+		outPack1.insert(
+			outPack1.end(),
+			eofBackPacket.begin(),
+			eofBackPacket.end()
+		);
+	newConnection->SendMessage(outPack1);
+
     std::fprintf(output_file, "\n");
 	std::fflush(output_file);
 }
@@ -723,7 +907,9 @@ void dbms::select_rows_aggregate(
 	const select_info_t *info,
 	const std::vector<table_manager*> &required_tables,
 	const std::vector<expr_node_t*> &exprs,
-	const std::vector<std::string> &)
+	const std::vector<std::string> &, 
+	std::shared_ptr< SystemAbstractions::NetworkConnection > newConnection,
+	uint8_t seq_)
 {
 	if(exprs.size() != 1)
 	{
@@ -807,9 +993,12 @@ void dbms::select_rows_aggregate(
 		}
 	);
 
+	std::string result;
+
 	if(expr->op == OPERATOR_COUNT)
 	{
 		std::fprintf(output_file, "%d\n", counter);
+		result = std::to_string(counter);
 	} else {
 		if(agg_type != TERM_FLOAT && agg_type != TERM_INT)
 		{
@@ -824,22 +1013,57 @@ void dbms::select_rows_aggregate(
 			else val_f /= counter;
 			std::fprintf(output_file, "%f\n", val_f);
 			printf("%f\n", val_f);
+			result = std::to_string(val_f);
 		} else if(agg_type == TERM_FLOAT) {
 			std::fprintf(output_file, "%f\n", val_f);
 			printf("%f\n", val_f);
+			result = std::to_string(val_f);
 		} else if(agg_type == TERM_INT) {
 			std::fprintf(output_file, "%d\n", val_i);
 			printf("%d\n", val_i);
+			result = std::to_string(val_i);
 		}
 	}
 
+	seq_ ++;
+	std::vector<std::string> row;
+	row.push_back(result);
+	Protocol::RowPacket rowPack(row);
+	std::vector< uint8_t > rowPacket = rowPack.Pack();
+	std::vector< uint8_t > outPack;
+	outPack.push_back(rowPacket.size());
+	outPack.push_back(0);
+	outPack.push_back(0);
+	outPack.push_back(seq_);
+	outPack.insert(
+		outPack.end(),
+		rowPacket.begin(),
+		rowPacket.end()
+	);
+	newConnection->SendMessage(outPack);
+
+	seq_ ++;
+	// EOF
+	Protocol::EofPacket eofBack(0, 2);
+	std::vector< uint8_t > eofBackPacket = eofBack.Pack();
+	std::vector< uint8_t > outPack1;
+		outPack1.push_back(eofBackPacket.size());
+		outPack1.push_back(0);
+		outPack1.push_back(0);
+		outPack1.push_back(seq_);
+		outPack1.insert(
+			outPack1.end(),
+			eofBackPacket.begin(),
+			eofBackPacket.end()
+		);
+	newConnection->SendMessage(outPack1);
 	std::printf("[Info] %d row(s) selected.\n", counter);
 	std::fprintf(output_file, "\n");
 	printf("\n");
 	std::fflush(output_file);
 }
 
-void dbms::delete_rows(const delete_info_t *info)
+void dbms::delete_rows(const delete_info_t *info, std::shared_ptr< SystemAbstractions::NetworkConnection > newConnection)
 {
 	if(!assert_db_open())
 		return;
@@ -862,10 +1086,24 @@ void dbms::delete_rows(const delete_info_t *info)
 	int counter = 0;
 	for(int rid : delete_list)
 		counter += tm->remove_record(rid);
+
 	std::printf("[Info] %d row(s) deleted.\n", counter);
+	Protocol::OkPacket okPack;
+    std::vector<uint8_t> outPut = okPack.Pack(counter, 0, 2, 0);
+	std::vector< uint8_t > res;
+	res.push_back(outPut.size());
+	res.push_back(0);
+	res.push_back(0);
+	res.push_back(1);
+	res.insert(
+		res.end(),
+		outPut.begin(),
+		outPut.end()
+	);
+	newConnection->SendMessage(res);
 }
 
-void dbms::insert_rows(const insert_info_t *info)
+void dbms::insert_rows(const insert_info_t *info, std::shared_ptr< SystemAbstractions::NetworkConnection > newConnection)
 {
 	if(!assert_db_open())
 		return;
@@ -944,14 +1182,27 @@ void dbms::insert_rows(const insert_info_t *info)
 		count_fail += 1 - succ;
 	}
 
+	Protocol::OkPacket okPack;
+    std::vector<uint8_t> outPut = okPack.Pack(count_succ, 0, 2, 0);
+	std::vector< uint8_t > res;
+	res.push_back(outPut.size());
+	res.push_back(0);
+	res.push_back(0);
+	res.push_back(1);
+	res.insert(
+		res.end(),
+		outPut.begin(),
+		outPut.end()
+	);
+	newConnection->SendMessage(res);
 	std::printf("[Info] %d row(s) inserted, %d row(s) failed.\n", count_succ, count_fail);
 }
 
-void dbms::drop_index(const char *tb_name, const char *col_name)
+void dbms::drop_index(const char *tb_name, const char *col_name, std::shared_ptr< SystemAbstractions::NetworkConnection > newConnection)
 {
 }
 
-void dbms::create_index(const char *tb_name, const char *col_name)
+void dbms::create_index(const char *tb_name, const char *col_name, std::shared_ptr< SystemAbstractions::NetworkConnection > newConnection)
 {
 	if(!assert_db_open())
 		return;
@@ -962,7 +1213,19 @@ void dbms::create_index(const char *tb_name, const char *col_name)
 	} else {
 		tb->create_index(col_name);
 	}
-	printf("OK!\n");
+	Protocol::OkPacket okPack;
+    std::vector<uint8_t> outPut = okPack.Pack(0, 0, 2, 0);
+	std::vector< uint8_t > res;
+	res.push_back(outPut.size());
+	res.push_back(0);
+	res.push_back(0);
+	res.push_back(1);
+	res.insert(
+		res.end(),
+		outPut.begin(),
+		outPut.end()
+	);
+	newConnection->SendMessage(res);
 }
 
 bool dbms::assert_db_open()

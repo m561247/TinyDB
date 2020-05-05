@@ -1,7 +1,9 @@
 CREATE DATABASE db_primary;
-SET OUTPUT = 'test_primary.out';
 USE db_primary;
-CREATE TABLE Persons ( PersonID int PRIMARY KEY, Name varchar(20) PRIMARY KEY, Other varchar(10));
+CREATE TABLE Persons ( 
+    PersonID int PRIMARY KEY, 
+    Name varchar(20) PRIMARY KEY, 
+    Other varchar(10));
 
 SHOW TABLE Persons;
 

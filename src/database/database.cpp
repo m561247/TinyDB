@@ -17,7 +17,7 @@ database::~database()
 void database::open(const char *db_name)
 {
 	assert(!is_opened());
-	std::string filename = db_name;
+	std::string filename = "data/" + std::string(db_name);
 	filename += ".database";
 	std::ifstream ifs(filename, std::ios::binary);
 	ifs.read((char*)&info, sizeof(info));
@@ -53,7 +53,7 @@ void database::close()
 		}
 	}
 
-	std::string filename = info.db_name;
+	std::string filename =  "data/" + std::string(info.db_name);
 	filename += ".database";
 	std::ofstream ofs(filename, std::ios::binary);
 	ofs.write((char*)&info, sizeof(info));
@@ -87,7 +87,7 @@ void database::drop()
 	}
 
 	info.table_num = 0;
-	std::string filename = info.db_name;
+	std::string filename = "data/" + std::string(info.db_name);
 	filename += ".database";
 	close();
 	std::remove(filename.c_str());

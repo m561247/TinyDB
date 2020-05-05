@@ -8,7 +8,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "defs.h"
-#include "execute.h"
+#include "parser.h"
 
 void yyerror(const char *s);
 
@@ -81,21 +81,21 @@ sql_stmts  :  sql_stmt
 		   |  sql_stmts sql_stmt
 		   ;
 
-sql_stmt   :  create_table_stmt ';'    { execute_create_table($1); }
-		   |  create_database_stmt ';' { execute_create_database($1); }
-		   |  use_database_stmt ';'    { execute_use_database($1); }
-		   |  show_database_stmt ';'   { execute_show_database($1); }
-		   |  drop_database_stmt ';'   { execute_drop_database($1); }
-		   |  show_table_stmt ';'      { execute_show_table($1); }
-		   |  drop_table_stmt ';'      { execute_drop_table($1); }
-		   |  insert_stmt ';'          { execute_insert($1); }
-		   |  update_stmt ';'          { execute_update($1); }
-		   |  delete_stmt ';'          { execute_delete($1); }
-		   |  select_stmt ';'          { execute_select($1); }
-		   |  EXIT ';'                 { execute_quit(); exit(0); }
-		   |  SET OUTPUT '=' STRING_LITERAL ';'  { execute_switch_output($4); }
-		   |  CREATE INDEX table_name '(' IDENTIFIER ')' ';' { execute_create_index($3, $5); }
-		   |  DROP   INDEX table_name '(' IDENTIFIER ')' ';' { execute_drop_index($3, $5); }
+sql_stmt   :  create_table_stmt ';'    { parser_create_table($1); }
+		   |  create_database_stmt ';' { parser_create_database($1); }
+		   |  use_database_stmt ';'    { parser_use_database($1); }
+		   |  show_database_stmt ';'   { parser_show_database($1); }
+		   |  drop_database_stmt ';'   { parser_drop_database($1); }
+		   |  show_table_stmt ';'      { parser_show_table($1); }
+		   |  drop_table_stmt ';'      { parser_drop_table($1); }
+		   |  insert_stmt ';'          { parser_insert($1); }
+		   |  update_stmt ';'          { parser_update($1); }
+		   |  delete_stmt ';'          { parser_delete($1); }
+		   |  select_stmt ';'          { parser_select($1); }
+		   |  EXIT ';'                 { parser_quit(); exit(0); }
+		   |  SET OUTPUT '=' STRING_LITERAL ';'  { parser_switch_output($4); }
+		   |  CREATE INDEX table_name '(' IDENTIFIER ')' ';' { parser_create_index($3, $5); }
+		   |  DROP   INDEX table_name '(' IDENTIFIER ')' ';' { parser_drop_index($3, $5); }
 		   ;
 
 create_table_stmt : CREATE TABLE table_name '(' table_fields table_extra_options ')' {
