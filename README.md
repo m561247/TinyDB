@@ -133,18 +133,6 @@ SELECT * FROM Persons AS P1, Persons AS P2 WHERE P1.PersonID = P2.PersonID;
 
 ![4](https://learnbycoding.oss-cn-beijing.aliyuncs.com/004.png)
 
-## TODO List
-
-| 模块名                       | 排期    | 进度 |
-| ---------------------------- | ------- | ---- |
-| 兼容 MySQL 协议              | 1 month | Done |
-| 实现 epoll 和多线程          | 2 week  |      |
-| 更换 RocksDB 存储引擎        | 1 month |      |
-| 实现 Raft 库                 | 1 month |      |
-| 实现多副本分布式强一致存储层 | 1 month |      |
-| 开发 Proxy 分离计算层        | 1 month |      |
-| 开发调度管理层               | 2 month |      |
-
 ## Acknowledgments
 
 *  基于项目 TrivialDB 开发
