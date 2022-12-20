@@ -50,21 +50,15 @@ set_target_properties(gtest gtest_main PROPERTIES
 	FOLDER libraries
 )
 
-# User Library
-add_subdirectory(CppStringPlus)
-add_subdirectory(SystemPort)
-add_subdirectory(protocol)
+add_subdirectory(network)
 
 add_library(${CMAKE_PROJECT_NAME}_static STATIC ${SOURCE} ${HEADERS})
-target_link_libraries(${CMAKE_PROJECT_NAME}_static 
-	SystemPort
-	protocol
-	CppStringPlus
-)
 
 add_executable(${CMAKE_PROJECT_NAME} src/main.cpp)
 target_include_directories(${CMAKE_PROJECT_NAME} PUBLIC include)
 target_link_libraries(${CMAKE_PROJECT_NAME} PUBLIC
 					  sql_parser
+					  network
+					  pthread
 					  ${CMAKE_PROJECT_NAME}_static
 					  )

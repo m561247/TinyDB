@@ -22,6 +22,7 @@ set(Headers
     include/protocol/Type.hpp
     include/protocol/Ok.hpp
     include/protocol/Err.hpp
+    include/protocol/mysql_common.h
 )
 
 set(Sources
