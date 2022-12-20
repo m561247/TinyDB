@@ -7,7 +7,8 @@ CREATE TABLE Persons (
    LastName varchar(20), 
    FirstName varchar(20), 
    Address varchar(20), 
-   City varchar(10));
+   City varchar(10)
+);
 
 CREATE INDEX Persons(PersonID);
 CREATE INDEX Persons(FirstName);
@@ -47,4 +48,3 @@ SELECT COUNT(*) FROM Persons;
 SELECT SUM(PersonID) FROM Persons;
 SELECT AVG(PersonID) FROM Persons;
 SELECT PersonID, LastName FROM Persons;
-
