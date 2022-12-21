@@ -2,6 +2,8 @@
 #define __TRIVIALDB_TABLE_HEADER__
 #include "../defs.h"
 #include <stdint.h>
+#include "../parser/defs.h"
+
 
 struct table_header_t
 {
@@ -34,5 +36,6 @@ struct table_header_t
 	void dump();
 };
 
+bool fill_table_header(table_header_t *header, const table_def_t *table);
 
 #endif

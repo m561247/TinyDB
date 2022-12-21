@@ -53,12 +53,15 @@ set_target_properties(gtest gtest_main PROPERTIES
 add_subdirectory(network)
 
 add_library(${CMAKE_PROJECT_NAME}_static STATIC ${SOURCE} ${HEADERS})
+target_link_libraries(${CMAKE_PROJECT_NAME}_static PUBLIC
+	network
+	pthread
+)
 
 add_executable(${CMAKE_PROJECT_NAME} src/main.cpp)
 target_include_directories(${CMAKE_PROJECT_NAME} PUBLIC include)
 target_link_libraries(${CMAKE_PROJECT_NAME} PUBLIC
 					  sql_parser
-					  network
 					  pthread
 					  ${CMAKE_PROJECT_NAME}_static
 					  )

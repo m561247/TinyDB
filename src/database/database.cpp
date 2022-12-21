@@ -3,10 +3,10 @@
 #include <string>
 #include <cstring>
 #include <cstdio>
+#include <iostream>
 
-database::database() : opened(false)
+database::database() : opened(false), tab_count(0)
 {
-	
 }
 
 database::~database()
@@ -69,9 +69,11 @@ void database::create_table(const table_header_t *header)
 		std::fprintf(stderr, "[Error] table `%s` already exists.\n", header->table_name);
 	} else {
 		int id = info.table_num++;
+		std::cout << "tab num " << std::to_string(info.table_num) << std::endl;
 		std::strncpy(info.table_name[id], header->table_name, MAX_NAME_LEN);
 		tables[id] = new table_manager;
 		tables[id]->create(header->table_name, header);
+		tab_count += 1;
 	}
 	printf("OK!\n");
 }
@@ -148,7 +150,7 @@ void database::show_info()
 {
 	std::printf("======== Database Info Begin ========\n");
 	std::printf("Database name = %s\n", info.db_name);
-	std::printf("Table number  = %d\n", info.table_num);
+	std::printf("Table number  = %d\n", tab_count);
 	for(int i = 0; i != info.table_num; ++i)
 		std::printf("  [table] name = %s\n", info.table_name[i]);
 	std::printf("======== Database Info End   ========\n");

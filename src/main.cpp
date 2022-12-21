@@ -30,6 +30,10 @@
 #include "../network/client.h"
 #include "../network/server.h"
 #include "../network/socket.h"
+#include "parser/defs.h"
+#include "parser/parser.h"
+
+extern "C" char run_parser(const char *input);
 
 Uhpsqld::Uhpsqld() : port_(0) {}
 
@@ -60,7 +64,8 @@ bool Uhpsqld::_Recycle() {
 
 int main(int argc, char *argv[]) {
   Uhpsqld svr;
-
+  std::cout << "WELCOME TO TINY DB!" << std::endl;
+  run_parser("USE db;");
   svr.MainLoop(false);
 
   return 0;

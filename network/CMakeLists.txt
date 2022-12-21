@@ -26,4 +26,7 @@ list(APPEND network_sources type.cc)
 set(network_INCLUDE_DIR ${network_sources_SOURCE_DIR})
 
 add_library(network ${network_sources})
+target_link_libraries(network PUBLIC
+    tinydb_static
+)
 target_include_directories(network PUBLIC ${network_INCLUDE_DIR})

@@ -20,6 +20,8 @@ class database
 	table_manager *tables[MAX_TABLE_NUM];
 
 	bool opened;
+	int tab_count;
+
 public:
 	database();
 	~database();
@@ -28,6 +30,8 @@ public:
 	void create(const char *db_name);
 	void drop();
 	void close();
+	struct database_info get_db_info() {return info;};
+	int get_tab_num() { return tab_count; }
 	const char *get_name() { return info.db_name; }
 
 	table_manager *get_table(const char *name);

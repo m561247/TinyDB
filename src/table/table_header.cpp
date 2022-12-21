@@ -4,7 +4,6 @@
 #include "table_header.h"
 #include "../utils/type_cast.h"
 #include "../expression/expression.h"
-#include "../parser/defs.h"
 
 bool fill_table_header(table_header_t *header, const table_def_t *table)
 {

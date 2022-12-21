@@ -5,6 +5,10 @@
 #include "../expression/expression.h"
 #include "../utils/type_cast.h"
 #include "../table/record.h"
+#include "../../network/field.h"
+#include "../../network/eof.h"
+#include "../../network/ok.h"
+
 #include <vector>
 #include <limits>
 #include <algorithm>
@@ -448,7 +452,7 @@ void dbms::close_database()
 	std::printf("call closed db ~");
 }
 
-void dbms::switch_database(const char *db_name)
+void dbms::switch_database(const char *db_name, Client* cli, const char *pkt)
 {
 	if(cur_db)
 	{
@@ -458,44 +462,30 @@ void dbms::switch_database(const char *db_name)
 	}
 	cur_db = new database();
 	cur_db->open(db_name);
-	// Protocol::OkPacket okPack;
-    // std::vector<uint8_t> outPut = okPack.Pack(0, 0, 2, 0);
-	// std::vector< uint8_t > res;
-	// res.push_back(outPut.size());
-	// res.push_back(0);
-	// res.push_back(0);
-	// res.push_back(1);
-	// res.insert(
-	// 	res.end(),
-	// 	outPut.begin(),
-	// 	outPut.end()
-	// );
-	// newConnection->SendMessage(res);
+	std::vector<uint8_t> OkPacket = {7, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0};
+	OkPacket[3] = pkt[3] + 1;
+	UnboundedBuffer reply_;
+	reply_.PushData(std::string(OkPacket.begin(), OkPacket.end()).c_str(),
+					OkPacket.size());
+	cli->SendPacket(reply_);
 	printf("OK!\n");
 }
 
-void dbms::create_database(const char *db_name)
+void dbms::create_database(const char *db_name, Client* cli, const char *pkt)
 {
 	database db;
 	db.create(db_name);
 	db.close();
 	switch_select_output(db_name);
-	// Protocol::OkPacket okPack;
-    // std::vector<uint8_t> outPut = okPack.Pack(0, 0, 2, 0);
-	// std::vector< uint8_t > res;
-	// res.push_back(outPut.size());
-	// res.push_back(0);
-	// res.push_back(0);
-	// res.push_back(1);
-	// res.insert(
-	// 	res.end(),
-	// 	outPut.begin(),
-	// 	outPut.end()
-	// );
-	// newConnection->SendMessage(res);
+	std::vector<uint8_t> OkPacket = {7, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0};
+	OkPacket[3] = pkt[3] + 1;
+	UnboundedBuffer reply_;
+	reply_.PushData(std::string(OkPacket.begin(), OkPacket.end()).c_str(),
+					OkPacket.size());
+	cli->SendPacket(reply_);
 }
 
-void dbms::drop_database(const char *db_name)
+void dbms::drop_database(const char *db_name, Client* cli, const char *pkt)
 {
 	if(cur_db && std::strcmp(cur_db->get_name(), db_name) == 0)
 	{
@@ -506,39 +496,148 @@ void dbms::drop_database(const char *db_name)
 	database db;
 	db.open(db_name);
 	db.drop();
-	// Protocol::OkPacket okPack;
-    // std::vector<uint8_t> outPut = okPack.Pack(0, 0, 2, 0);
-	// std::vector< uint8_t > res;
-	// res.push_back(outPut.size());
-	// res.push_back(0);
-	// res.push_back(0);
-	// res.push_back(1);
-	// res.insert(
-	// 	res.end(),
-	// 	outPut.begin(),
-	// 	outPut.end()
-	// );
-	// newConnection->SendMessage(res);
+	std::vector<uint8_t> OkPacket = {7, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0};
+	OkPacket[3] = pkt[3] + 1;
+	UnboundedBuffer reply_;
+	reply_.PushData(std::string(OkPacket.begin(), OkPacket.end()).c_str(),
+					OkPacket.size());
+	cli->SendPacket(reply_);
 }
 
-void dbms::show_database(const char *db_name)
+void dbms::show_database(const char *db_name, Client* cli, const char *pkt)
 {
 	database db;
 	db.open(db_name);
 	db.show_info();
-	// Protocol::OkPacket okPack;
-    // std::vector<uint8_t> outPut = okPack.Pack(0, 0, 2, 0);
-	// std::vector< uint8_t > res;
-	// res.push_back(outPut.size());
-	// res.push_back(0);
-	// res.push_back(0);
-	// res.push_back(1);
-	// res.insert(
-	// 	res.end(),
-	// 	outPut.begin(),
-	// 	outPut.end()
-	// );
-	// newConnection->SendMessage(res);
+	auto dbInfo = db.get_db_info();
+	// pack seq
+	uint8_t seq = 1;
+	// 1.field count pack
+	std::vector<uint8_t> out_pack;
+	out_pack.push_back(1);
+	out_pack.push_back(0);
+	out_pack.push_back(0);
+	out_pack.push_back(seq);
+	out_pack.push_back(static_cast<uint8_t>(2));
+	UnboundedBuffer reply_;
+	reply_.PushData(std::string(out_pack.begin(), out_pack.end()).c_str(),
+					out_pack.size());
+	cli->SendPacket(reply_);
+	reply_.Clear();
+	out_pack.clear();
+	// 2.table header
+	Protocol::FieldPacket new_field_pack(std::string("Item"), static_cast< uint32_t >(6165), std::string(dbInfo.db_name),
+              std::string(dbInfo.db_name), std::string(dbInfo.db_name), std::string(dbInfo.db_name),
+              80, 33, 0, 0);
+	seq ++;
+	std::vector< uint8_t > field_pack = new_field_pack.Pack();
+	out_pack.push_back(field_pack.size());
+	out_pack.push_back(0);
+	out_pack.push_back(0);
+	out_pack.push_back(seq);
+	out_pack.insert(
+		out_pack.end(),
+		field_pack.begin(),
+		field_pack.end()
+	);
+	reply_.PushData(std::string(out_pack.begin(), out_pack.end()).c_str(),
+					out_pack.size());
+	cli->SendPacket(reply_);
+	reply_.Clear();
+	out_pack.clear();
+
+	Protocol::FieldPacket new_field_pack_1(std::string("Value"), static_cast< uint32_t >(6165), std::string(dbInfo.db_name),
+              std::string(dbInfo.db_name), std::string(dbInfo.db_name), std::string(dbInfo.db_name),
+              80, 33, 0, 0);
+	seq ++;
+	std::vector< uint8_t > field_pack_1 = new_field_pack_1.Pack();
+	out_pack.push_back(field_pack_1.size());
+	out_pack.push_back(0);
+	out_pack.push_back(0);
+	out_pack.push_back(seq);
+	out_pack.insert(
+		out_pack.end(),
+		field_pack_1.begin(),
+		field_pack_1.end()
+	);
+	reply_.PushData(std::string(out_pack.begin(), out_pack.end()).c_str(),
+					out_pack.size());
+	cli->SendPacket(reply_);
+	reply_.Clear();
+	out_pack.clear();
+	// 3.eof 
+	Protocol::EofPacket eof(0, 2);
+    std::vector< uint8_t > eof_packet = eof.Pack();
+	seq ++; // 254, 0, 0, 2, 0
+	out_pack.push_back(eof_packet.size());
+	out_pack.push_back(0);
+	out_pack.push_back(0);
+	out_pack.push_back(seq);
+	out_pack.insert(
+		out_pack.end(),
+		eof_packet.begin(),
+		eof_packet.end()
+	);
+	reply_.PushData(std::string(out_pack.begin(), out_pack.end()).c_str(),
+					out_pack.size());
+	cli->SendPacket(reply_);
+	reply_.Clear();
+	out_pack.clear();
+	// 4.rows
+	// db name
+	seq ++;
+	auto row_val = std::vector<std::string>{std::string("DATABASE NAME"), std::string(dbInfo.db_name)};
+	Protocol::RowPacket row_pack1(row_val);
+	std::vector< uint8_t > row_packet1 = row_pack1.Pack();
+	out_pack.push_back(row_packet1.size());
+	out_pack.push_back(0);
+	out_pack.push_back(0);
+	out_pack.push_back(seq);
+	out_pack.insert(
+		out_pack.end(),
+		row_packet1.begin(),
+		row_packet1.end()
+	);
+	reply_.PushData(std::string(out_pack.begin(), out_pack.end()).c_str(),
+					out_pack.size());
+	cli->SendPacket(reply_);
+	reply_.Clear();
+	out_pack.clear();
+	// table count
+	seq ++;
+	row_val = std::vector<std::string>{std::string("TABLE COUNT"), std::to_string(db.get_tab_num())};
+	Protocol::RowPacket row_pack2(row_val);
+	std::vector< uint8_t > row_packet2 = row_pack2.Pack();
+	out_pack.push_back(row_packet2.size());
+	out_pack.push_back(0);
+	out_pack.push_back(0);
+	out_pack.push_back(seq);
+	out_pack.insert(
+		out_pack.end(),
+		row_packet2.begin(),
+		row_packet2.end()
+	);
+	reply_.PushData(std::string(out_pack.begin(), out_pack.end()).c_str(),
+					out_pack.size());
+	cli->SendPacket(reply_);
+	reply_.Clear();
+	out_pack.clear();
+
+	// 5.eof
+	seq ++; // 254, 0, 0, 2, 0
+	out_pack.push_back(eof_packet.size());
+	out_pack.push_back(0);
+	out_pack.push_back(0);
+	out_pack.push_back(seq);
+	out_pack.insert(
+		out_pack.end(),
+		eof_packet.begin(),
+		eof_packet.end()
+	);
+	reply_.PushData(std::string(out_pack.begin(), out_pack.end()).c_str(),
+					out_pack.size());
+	cli->SendPacket(reply_);
+	reply_.Clear();
 }
 
 void dbms::drop_table(const char *table_name)
@@ -562,26 +661,19 @@ void dbms::show_table(const char* table_name)
 	}
 }
 
-void dbms::create_table(const table_header_t *header)
+void dbms::create_table(const table_header_t *header, Client* cli, const char *pkt)
 {
 	if(assert_db_open())
 		cur_db->create_table(header);
-	// Protocol::OkPacket okPack;
-    // std::vector<uint8_t> outPut = okPack.Pack(0, 0, 2, 0);
-	// std::vector< uint8_t > res;
-	// res.push_back(outPut.size());
-	// res.push_back(0);
-	// res.push_back(0);
-	// res.push_back(1);
-	// res.insert(
-	// 	res.end(),
-	// 	outPut.begin(),
-	// 	outPut.end()
-	// );
-	// newConnection->SendMessage(res);
+	std::vector<uint8_t> OkPacket = {7, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0};
+	OkPacket[3] = pkt[3] + 1;
+	UnboundedBuffer reply_;
+	reply_.PushData(std::string(OkPacket.begin(), OkPacket.end()).c_str(),
+					OkPacket.size());
+	cli->SendPacket(reply_);
 }
 
-void dbms::update_rows(const update_info_t *info)
+void dbms::update_rows(const update_info_t *info, Client* cli, const char *pkt)
 {
 	if(!assert_db_open())
 		return;
@@ -619,24 +711,27 @@ void dbms::update_rows(const update_info_t *info)
 		return;
 	} catch(...) {
 	}
-	// Protocol::OkPacket okPack;
-    // std::vector<uint8_t> outPut = okPack.Pack(succ_count, 0, 2, 0);
-	// std::vector< uint8_t > res;
-	// res.push_back(outPut.size());
-	// res.push_back(0);
-	// res.push_back(0);
-	// res.push_back(1);
-	// res.insert(
-	// 	res.end(),
-	// 	outPut.begin(),
-	// 	outPut.end()
-	// );
-	// newConnection->SendMessage(res);
-	// std::printf("[Info] %d row(s) updated, %d row(s) failed.\n",
-	// 		succ_count, fail_count);
+	Protocol::OkPacket ok_pack;
+    std::vector<uint8_t> ok_packed = ok_pack.Pack(succ_count, 0, 2, 0);
+	std::vector< uint8_t > res;
+	res.push_back(ok_packed.size());
+	res.push_back(0);
+	res.push_back(0);
+	res.push_back(1);
+	res.insert(
+		res.end(),
+		ok_packed.begin(),
+		ok_packed.end()
+	);
+	UnboundedBuffer reply_;
+	reply_.PushData(std::string(res.begin(), res.end()).c_str(),
+					res.size());
+	cli->SendPacket(reply_);
+	std::printf("[Info] %d row(s) updated, %d row(s) failed.\n",
+			succ_count, fail_count);
 }
 
-void dbms::select_rows(const select_info_t *info)
+void dbms::select_rows(const select_info_t *info, Client* cli, const char *pkt)
 {
 	if(!assert_db_open())
 		return;
@@ -708,53 +803,67 @@ void dbms::select_rows(const select_info_t *info)
 	std::fprintf(output_file, "\n");
 	printf("\n");
 
-	// rows packet
-	std::vector<uint8_t> feildCountPacket;
-	feildCountPacket.push_back(1);
-	feildCountPacket.push_back(0);
-	feildCountPacket.push_back(0);
-	feildCountPacket.push_back(1);
-	feildCountPacket.push_back(static_cast<uint8_t>(headers.size()));
-	
-	// newConnection->SendMessage(feildCountPacket);
-	// uint8_t seq = 1;
-	// for(auto h : headers) {
-	// 	seq ++;
-	// 	linked_list_t *table_l = info->tables;
-	// 	table_join_info_t *table_info = (table_join_info_t*)table_l->data;
-	// 	std::cout << h << ",h ";
+	// pack seq
+	uint8_t seq = 1;
+	// 1.field count pack
+	std::vector<uint8_t> out_pack;
+	out_pack.push_back(1);
+	out_pack.push_back(0);
+	out_pack.push_back(0);
+	out_pack.push_back(seq);
+	out_pack.push_back(static_cast<uint8_t>(headers.size()));
+	UnboundedBuffer reply_;
+	reply_.PushData(std::string(out_pack.begin(), out_pack.end()).c_str(),
+					out_pack.size());
+	cli->SendPacket(reply_);
+	reply_.Clear();
+	out_pack.clear();
 
-	// 	Protocol::FieldPacket newFieldPack(h, static_cast< uint32_t >(6165), std::string(table_info->table), 
-    //     std::string(table_info->table), std::string(cur_db->get_name()), h, 80,
-    //     33, 0, 0);
-	// 	std::vector< uint8_t > fieldPack = newFieldPack.Pack();
-	// 	std::vector< uint8_t > outPack;
-	// 	outPack.push_back(fieldPack.size());
-	// 	outPack.push_back(0);
-	// 	outPack.push_back(0);
-	// 	outPack.push_back(seq);
-	// 	outPack.insert(
-	// 		outPack.end(),
-	// 		fieldPack.begin(),
-	// 		fieldPack.end()
-	// 	);
-	// 	newConnection->SendMessage(outPack);
-	// }
-	// // // EOF
-    // Protocol::EofPacket eof(0, 2);
-    // std::vector< uint8_t > eofPacket = eof.Pack();
-	// seq ++; // 254, 0, 0, 2, 0
-	// std::vector< uint8_t > outPack;
-	// 	outPack.push_back(eofPacket.size());
-	// 	outPack.push_back(0);
-	// 	outPack.push_back(0);
-	// 	outPack.push_back(seq);
-	// 	outPack.insert(
-	// 		outPack.end(),
-	// 		eofPacket.begin(),
-	// 		eofPacket.end()
-	// 	);
-	// newConnection->SendMessage(outPack);
+	// 2.table header
+	for(auto h : headers) {
+		seq ++;
+		linked_list_t *table_l = info->tables;
+		table_join_info_t *table_info = (table_join_info_t*)table_l->data;
+		std::cout << h << ",h ";
+
+		Protocol::FieldPacket new_field_pack(h, static_cast< uint32_t >(6165), std::string(table_info->table), 
+        std::string(table_info->table), std::string(cur_db->get_name()), h, 80,
+        33, 0, 0);
+		std::vector< uint8_t > field_pack = new_field_pack.Pack();
+		out_pack.push_back(field_pack.size());
+		out_pack.push_back(0);
+		out_pack.push_back(0);
+		out_pack.push_back(seq);
+		out_pack.insert(
+			out_pack.end(),
+			field_pack.begin(),
+			field_pack.end()
+		);
+		reply_.PushData(std::string(out_pack.begin(), out_pack.end()).c_str(),
+						out_pack.size());
+		cli->SendPacket(reply_);
+		reply_.Clear();
+		out_pack.clear();
+	}
+
+	// 3.eof 
+	Protocol::EofPacket eof(0, 2);
+    std::vector< uint8_t > eof_packet = eof.Pack();
+	seq ++; // 254, 0, 0, 2, 0
+	out_pack.push_back(eof_packet.size());
+	out_pack.push_back(0);
+	out_pack.push_back(0);
+	out_pack.push_back(seq);
+	out_pack.insert(
+		out_pack.end(),
+		eof_packet.begin(),
+		eof_packet.end()
+	);
+	reply_.PushData(std::string(out_pack.begin(), out_pack.end()).c_str(),
+					out_pack.size());
+	cli->SendPacket(reply_);
+	reply_.Clear();
+	out_pack.clear();
 
 	if(is_aggregate)
 	{
@@ -763,7 +872,8 @@ void dbms::select_rows(const select_info_t *info)
 			required_tables,
 			exprs,
 			expr_names,
-			0
+			cli,
+			seq
 		);
 
 		return;
@@ -859,7 +969,46 @@ void dbms::select_rows(const select_info_t *info)
 
 	std::printf("[Info] %d row(s) selected.\n", counter);
 
-
+	for(auto r : rows) {
+		seq ++;
+		std::cout << std::endl;
+		for(auto item : r) {
+			std::cout  << item << "  | ";
+		}
+		std::cout << std::endl;
+		Protocol::RowPacket row_pack(r);
+		std::vector< uint8_t > row_packed = row_pack.Pack();
+		std::vector< uint8_t > out_pack;
+		out_pack.push_back(row_packed.size());
+		out_pack.push_back(0);
+		out_pack.push_back(0);
+		out_pack.push_back(seq);
+		out_pack.insert(
+			out_pack.end(),
+			row_packed.begin(),
+			row_packed.end()
+		);
+		reply_.PushData(std::string(out_pack.begin(), out_pack.end()).c_str(),
+						out_pack.size());
+		cli->SendPacket(reply_);
+		reply_.Clear();
+		out_pack.clear();
+	}
+	// 5.eof
+	seq ++;
+	out_pack.push_back(eof_packet.size());
+	out_pack.push_back(0);
+	out_pack.push_back(0);
+	out_pack.push_back(seq);
+	out_pack.insert(
+		out_pack.end(),
+		eof_packet.begin(),
+		eof_packet.end()
+	);
+	reply_.PushData(std::string(out_pack.begin(), out_pack.end()).c_str(),
+					out_pack.size());
+	cli->SendPacket(reply_);
+	reply_.Clear();
     std::fprintf(output_file, "\n");
 	std::fflush(output_file);
 }
@@ -869,7 +1018,8 @@ void dbms::select_rows_aggregate(
 	const std::vector<table_manager*> &required_tables,
 	const std::vector<expr_node_t*> &exprs,
 	const std::vector<std::string> &, 
-	uint8_t seq_)
+	Client* cli,
+	uint8_t seq)
 {
 	if(exprs.size() != 1)
 	{
@@ -985,13 +1135,53 @@ void dbms::select_rows_aggregate(
 		}
 	}
 
+	seq++;
+	std::vector<std::string> row;
+	row.push_back(result);
+	Protocol::RowPacket row_pack(row);
+	std::vector< uint8_t > row_packed = row_pack.Pack();
+	std::vector< uint8_t > out_pack;
+	out_pack.push_back(row_packed.size());
+	out_pack.push_back(0);
+	out_pack.push_back(0);
+	out_pack.push_back(seq);
+	out_pack.insert(
+		out_pack.end(),
+		row_packed.begin(),
+		row_packed.end()
+	);
+	UnboundedBuffer reply_;
+	reply_.PushData(std::string(out_pack.begin(), out_pack.end()).c_str(),
+					out_pack.size());
+	cli->SendPacket(reply_);
+	reply_.Clear();
+	out_pack.clear();
+
+	// eof
+	seq ++;
+	Protocol::EofPacket eof(0, 2);
+    std::vector< uint8_t > eof_packet = eof.Pack();
+	out_pack.push_back(eof_packet.size());
+	out_pack.push_back(0);
+	out_pack.push_back(0);
+	out_pack.push_back(seq);
+	out_pack.insert(
+		out_pack.end(),
+		eof_packet.begin(),
+		eof_packet.end()
+	);
+	reply_.PushData(std::string(out_pack.begin(), out_pack.end()).c_str(),
+					out_pack.size());
+	cli->SendPacket(reply_);
+	reply_.Clear();
+
 	std::printf("[Info] %d row(s) selected.\n", counter);
 	std::fprintf(output_file, "\n");
 	printf("\n");
 	std::fflush(output_file);
 }
 
-void dbms::delete_rows(const delete_info_t *info)
+void dbms::delete_rows(const delete_info_t *info, Client* cli, const char *pkt)
 {
 	if(!assert_db_open())
 		return;
@@ -1015,10 +1205,26 @@ void dbms::delete_rows(const delete_info_t *info)
 	for(int rid : delete_list)
 		counter += tm->remove_record(rid);
 
+	Protocol::OkPacket ok_pack;
+    std::vector<uint8_t> ok_packed = ok_pack.Pack(counter, 0, 2, 0);
+	std::vector< uint8_t > res;
+	res.push_back(ok_packed.size());
+	res.push_back(0);
+	res.push_back(0);
+	res.push_back(1);
+	res.insert(
+		res.end(),
+		ok_packed.begin(),
+		ok_packed.end()
+	);
+	UnboundedBuffer reply_;
+	reply_.PushData(std::string(res.begin(), res.end()).c_str(),
+					res.size());
+	cli->SendPacket(reply_);
 	std::printf("[Info] %d row(s) deleted.\n", counter);
 }
 
-void dbms::insert_rows(const insert_info_t *info)
+void dbms::insert_rows(const insert_info_t *info, Client* cli, const char *pkt)
 {
 	if(!assert_db_open())
 		return;
@@ -1097,6 +1303,22 @@ void dbms::insert_rows(const insert_info_t *info)
 		count_fail += 1 - succ;
 	}
 
+	Protocol::OkPacket ok_pack;
+    std::vector<uint8_t> ok_packed = ok_pack.Pack(count_succ, 0, 2, 0);
+	std::vector< uint8_t > res;
+	res.push_back(ok_packed.size());
+	res.push_back(0);
+	res.push_back(0);
+	res.push_back(1);
+	res.insert(
+		res.end(),
+		ok_packed.begin(),
+		ok_packed.end()
+	);
+	UnboundedBuffer reply_;
+	reply_.PushData(std::string(res.begin(), res.end()).c_str(),
+					res.size());
+	cli->SendPacket(reply_);
 	std::printf("[Info] %d row(s) inserted, %d row(s) failed.\n", count_succ, count_fail);
 }
 

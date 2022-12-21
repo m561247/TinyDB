@@ -274,3 +274,7 @@ struct NocaseComp {
 #define ERR_PACKET 0xff
 
 #define INIT_PACKET_CNT 1
+
+#define MYSQL_COM_INIT_DB 0x02
+
+#define MYSQL_COM_QUERY 0x03

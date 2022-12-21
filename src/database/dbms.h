@@ -6,6 +6,8 @@
 #include "../expression/expression.h"
 #include <cstdio>
 #include "../../network/server.h"
+#include "../../network/client.h"
+#include "../../network/field.h"
 
 #define VERSION "1.0.0"
 #define MOCK_PMEMKV_REDIS_IP "172.17.0.2"
@@ -41,22 +43,22 @@ public:
 	~dbms();
 
 	void close_database();
-	void show_database(const char *db_name);
-	void switch_database(const char *db_name);
-	void drop_database(const char *db_name);
-	void create_database(const char *db_name);
+	void show_database(const char *db_name, Client* cli, const char *pkt);
+	void switch_database(const char *db_name, Client* cli, const char *pkt);
+	void drop_database(const char *db_name, Client* cli, const char *pkt);
+	void create_database(const char *db_name, Client* cli, const char *pkt);
 
-	void create_table(const table_header_t *header);
+	void create_table(const table_header_t *header, Client* cli, const char *pkt);
 	void show_table(const char *table_name);
 	void drop_table(const char *table_name);
 
 	void create_index(const char *tb_name, const char *col_name);
 	void drop_index(const char *tb_name, const char *col_name);
 
-	void insert_rows(const insert_info_t *info);
-	void delete_rows(const delete_info_t *info);
-	void select_rows(const select_info_t *info);
-	void update_rows(const update_info_t *info);
+	void insert_rows(const insert_info_t *info, Client* cli, const char *pkt);
+	void delete_rows(const delete_info_t *info, Client* cli, const char *pkt);
+	void select_rows(const select_info_t *info, Client* cli, const char *pkt);
+	void update_rows(const update_info_t *info, Client* cli, const char *pkt);
 
 	void switch_select_output(const char *filename);
 
@@ -65,7 +67,8 @@ public:
 		const std::vector<table_manager*> &required_tables,
 		const std::vector<expr_node_t*> &exprs,
 		const std::vector<std::string> &expr_names, 
-		uint8_t seq_);
+		Client* cli,
+		uint8_t seq);
 
 	bool value_exists(const char *table, const char *column, const char *data);
 
